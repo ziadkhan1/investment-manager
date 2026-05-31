@@ -1,0 +1,92 @@
+import io
+import re
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+from googleapiclient.http import MediaIoBaseDownload
+
+from config import DRIVE_FOLDER_ID, QUICK_SYNC_FOLDER_ID, SHEET_TITLE
+from services import get_service_account_email
+
+
+def parse_filename_timestamp(name: str):
+    m = re.search(r"Bluecoins_(\d{4}-\d{2}-\d{2}_\d{2}_\d{2}_\d{2})", name)
+    return datetime.strptime(m.group(1), "%Y-%m-%d_%H_%M_%S") if m else datetime.min
+
+
+def _download_fydb(drive_service, file_id: str) -> Path:
+    buf = io.BytesIO()
+    downloader = MediaIoBaseDownload(buf, drive_service.files().get_media(fileId=file_id))
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+        print(f"  {int(status.progress() * 100)}%", end="\r")
+    print()
+    tmp = tempfile.NamedTemporaryFile(suffix=".fydb", delete=False)
+    tmp.write(buf.getvalue())
+    tmp.close()
+    return Path(tmp.name)
+
+
+def download_latest_fydb(drive_service) -> Path:
+    query = "name contains 'Bluecoins' and name contains '.fydb' and trashed = false"
+    if DRIVE_FOLDER_ID:
+        query += f" and '{DRIVE_FOLDER_ID}' in parents"
+
+    results = drive_service.files().list(
+        q=query, fields="files(id, name, modifiedTime)", pageSize=20,
+    ).execute()
+
+    files = results.get("files", [])
+    if not files:
+        raise FileNotFoundError(
+            "No Bluecoins .fydb files found.\n"
+            f"Share the Drive folder with: {get_service_account_email()}"
+        )
+
+    files.sort(key=lambda f: parse_filename_timestamp(f["name"]), reverse=True)
+
+    print(f"Found {len(files)} Bluecoins file(s) on Drive:")
+    for f in files:
+        ts     = parse_filename_timestamp(f["name"])
+        ts_str = ts.strftime("%Y-%m-%d %H:%M:%S") if ts != datetime.min else "unknown"
+        print(f"  {f['name']}  ({ts_str})")
+
+    latest = files[0]
+    print(f"Using: {latest['name']}")
+    return _download_fydb(drive_service, latest["id"])
+
+
+def find_quick_sync_files(drive_service) -> list:
+    if not QUICK_SYNC_FOLDER_ID:
+        return []
+    query = (
+        "name contains '.fydb' and trashed = false "
+        f"and '{QUICK_SYNC_FOLDER_ID}' in parents"
+    )
+    results = drive_service.files().list(
+        q=query, fields="files(id, name, modifiedTime)", pageSize=50,
+    ).execute()
+    files = results.get("files", [])
+    files.sort(key=lambda f: parse_filename_timestamp(f["name"]), reverse=True)
+    return files
+
+
+def find_spreadsheet(drive_service) -> str:
+    query = (
+        f"name='{SHEET_TITLE}' "
+        "and mimeType='application/vnd.google-apps.spreadsheet' "
+        "and trashed=false"
+    )
+    if DRIVE_FOLDER_ID:
+        query += f" and '{DRIVE_FOLDER_ID}' in parents"
+
+    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+    files   = results.get("files", [])
+    if not files:
+        raise FileNotFoundError(
+            f"Google Sheet '{SHEET_TITLE}' not found.\n"
+            f"Create it and share with: {get_service_account_email()}"
+        )
+    return files[0]["id"]

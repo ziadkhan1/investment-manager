@@ -1,0 +1,22 @@
+# Credentials — never commit these
+*.json
+.env
+secrets/
+
+# Bluecoins database exports
+*.fydb
+
+# Excel exports
+*.xlsx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/

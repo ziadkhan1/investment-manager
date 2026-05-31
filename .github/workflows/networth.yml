@@ -1,0 +1,33 @@
+name: Bluecoins Net Worth
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 08:00 PKT (UTC+5) every day
+  workflow_dispatch:        # also runnable manually from GitHub Actions tab
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run net worth calculator
+        env:
+          GOOGLE_DRIVE_CREDENTIALS:  ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+          GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+          SHEET_TITLE:               ${{ secrets.SHEET_TITLE }}
+          GOLD_ACCOUNT_ID:           ${{ secrets.GOLD_ACCOUNT_ID }}
+          DRIVE_FOLDER_ID:           ${{ secrets.DRIVE_FOLDER_ID }}
+          QUICK_SYNC_FOLDER_ID:      ${{ secrets.QUICK_SYNC_FOLDER_ID }}
+        run: python bluecoins_networth.py
