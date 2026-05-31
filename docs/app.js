@@ -385,7 +385,7 @@ function renderContribution(vr) {
   const greenData = nomReturn.map((r) => Math.max(r, 0));
   const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
 
-  const xMax = Math.max(...currentBal, ...inflFloor) * 1.30;
+  const xMax = Math.max(...currentBal, ...nominal, ...inflFloor) * 1.18;
 
   const annotations = Object.fromEntries(
     inflFloor.map((floor, i) => [
