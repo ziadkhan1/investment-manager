@@ -453,7 +453,7 @@ function renderContribution(vr) {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { right: 4 } },
+      layout: { padding: { right: 0 } },
       plugins: {
         legend: legend('top'),
         annotation: { annotations },
@@ -462,10 +462,12 @@ function renderContribution(vr) {
             label: (item) => {
               const i  = item.dataIndex;
               const rg = realGain[i];
-              const rgStr = (rg >= 0 ? `Real gain: +PKR ${fmtN(rg)}` : `Real loss: PKR ${fmtN(rg)}`);
-              if (item.datasetIndex === 0) return ` Invested: PKR ${fmtN(nominal[i])}`;
-              if (item.datasetIndex === 1) return ` Profit: +PKR ${fmtN(nomReturn[i])}  |  ${rgStr}`;
-              return ` Loss: PKR ${fmtN(nomReturn[i])}  |  ${rgStr}`;
+              const rgStr = rg >= 0
+                ? ` Real gain:  +PKR ${fmtN(rg)}`
+                : ` Real loss:   PKR ${fmtN(rg)}`;
+              if (item.datasetIndex === 0) return ` Invested:   PKR ${fmtN(nominal[i])}`;
+              if (item.datasetIndex === 1) return [` Profit:    +PKR ${fmtN(nomReturn[i])}`, rgStr];
+              return [` Loss:       PKR ${fmtN(nomReturn[i])}`, rgStr];
             },
           },
         },
