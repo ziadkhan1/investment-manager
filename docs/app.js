@@ -371,32 +371,34 @@ function renderContribution(vr) {
   const { rows } = parseBlock(vr);
   if (!rows.length) return;
 
-  const labels  = rows.map((r) => r[0]);
-  const contrib = rows.map((r) => parseFloat(r[1]) || 0);
-  const returns = rows.map((r) => parseFloat(r[2]) || 0);
-  // % of inflation-adjusted cost basis that was returned
-  const retPct  = contrib.map((b, i) => b > 0 ? (returns[i] / b * 100) : 0);
+  const labels        = rows.map((r) => r[0]);
+  const contrib       = rows.map((r) => parseFloat(r[1]) || 0);
+  const returns       = rows.map((r) => parseFloat(r[2]) || 0);
+  // col 3: PKR needed today to match the purchasing power of each historical deposit
+  const inflFloor     = rows.map((r) => parseFloat(r[3]) || 0);
+  // % of real cost basis returned
+  const retPct        = contrib.map((b, i) => b > 0 ? (returns[i] / b * 100) : 0);
 
-  // One vertical annotation per account marking the inflation-adjusted cost floor
+  // One vertical annotation per account: dashed grey line at the CPI-inflated cost floor
   const annotations = Object.fromEntries(
-    contrib.map((b, i) => [
+    inflFloor.map((floor, i) => [
       `floor${i}`,
       {
         type:        'line',
-        xMin:        b,
-        xMax:        b,
+        xMin:        floor,
+        xMax:        floor,
         yMin:        i - 0.46,
         yMax:        i + 0.46,
-        borderColor: 'rgba(245,158,11,.95)',
-        borderWidth: 2.5,
-        borderDash:  [4, 3],
+        borderColor: 'rgba(160,160,170,.70)',
+        borderWidth: 1.5,
+        borderDash:  [5, 3],
         label: {
           display:         i === 0,
           content:         'Inflation floor',
           position:        'start',
-          yAdjust:         -14,
-          color:           '#F59E0B',
-          font:            { size: 8, weight: '600' },
+          yAdjust:         -13,
+          color:           'rgba(160,160,170,.85)',
+          font:            { size: 8, weight: '500' },
           backgroundColor: 'transparent',
           padding:         0,
         },
@@ -504,7 +506,7 @@ async function fetchAndRender() {
     );
     const blockFRow = R + nMonths + 3;
 
-    const batch2 = await batchGet([`Dashboard!A${blockFRow}:C`]);
+    const batch2 = await batchGet([`Dashboard!A${blockFRow}:D`]);
     const vrF    = batch2.valueRanges[0];
 
     renderNW(vrA);

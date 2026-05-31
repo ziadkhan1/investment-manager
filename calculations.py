@@ -353,22 +353,27 @@ def compute_inflation_rankings(
             acct_tx["transactionTypeID"].isin([2, 5]) & (acct_tx["amount_pkr"] > 0)
         ]
         if len(cost_tx):
-            tx_cpis   = cost_tx["period"].apply(
+            tx_cpis      = cost_tx["period"].apply(
                 lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today)
             )
-            real_cost = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
+            real_cost    = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
+            # Sum of each deposit × (cpi_today / cpi_at_deposit): the PKR you would need
+            # today to have the same purchasing power as when each deposit was made.
+            infl_adj_val = round((cost_tx["amount_pkr"] * (cpi_today / tx_cpis)).sum(), 2)
         else:
-            real_cost = 0.0
+            real_cost    = 0.0
+            infl_adj_val = 0.0
         all_time  = round(current_bal / real_cost, 4) if abs(real_cost) > 0.01 else ""
         real_gain = round(current_bal - real_cost, 2) if all_time != "" else ""
 
         invest_rows.append({
-            "Account":               name,
-            "Current Balance (PKR)": round(current_bal, 2),
-            "Real Cost Basis (PKR)": real_cost,
-            "All-Time Beat":         all_time,
+            "Account":                    name,
+            "Current Balance (PKR)":      round(current_bal, 2),
+            "Real Cost Basis (PKR)":      real_cost,
+            "All-Time Beat":              all_time,
             **_period_beats(name, current_bal),
-            "Real Gain/Loss (PKR)":  real_gain,
+            "Real Gain/Loss (PKR)":       real_gain,
+            "Inflation-Adj. Value (PKR)": infl_adj_val,
         })
 
     result_df = (
@@ -416,12 +421,13 @@ def compute_inflation_rankings(
         )
 
     total_row = pd.DataFrame([{
-        "Account":               "TOTAL NET WORTH",
-        "Current Balance (PKR)": total_pkr,
-        "Real Cost Basis (PKR)": net_real_cost,
-        "All-Time Beat":         total_ratio,
+        "Account":                    "TOTAL NET WORTH",
+        "Current Balance (PKR)":      total_pkr,
+        "Real Cost Basis (PKR)":      net_real_cost,
+        "All-Time Beat":              total_ratio,
         **total_period_cols,
-        "Real Gain/Loss (PKR)":  round(total_pkr - net_real_cost, 2) if total_ratio != "" else "",
+        "Real Gain/Loss (PKR)":       round(total_pkr - net_real_cost, 2) if total_ratio != "" else "",
+        "Inflation-Adj. Value (PKR)": "",
     }])
 
     return pd.concat([result_df, total_row], ignore_index=True)
@@ -569,11 +575,13 @@ def compute_dashboard_data(
         rankings["Real Gain/Loss (PKR)"].apply(lambda x: x != "" and pd.notna(x))
     ].copy()
     contrib_df = contrib_df[
-        ["Account", "Real Cost Basis (PKR)", "Real Gain/Loss (PKR)"]
+        ["Account", "Real Cost Basis (PKR)", "Real Gain/Loss (PKR)", "Inflation-Adj. Value (PKR)"]
     ].copy()
-    contrib_df.columns = ["Account", "Contribution (PKR)", "Investment Return (PKR)"]
-    contrib_df["Contribution (PKR)"]      = pd.to_numeric(contrib_df["Contribution (PKR)"],      errors="coerce").fillna(0).round(0)
-    contrib_df["Investment Return (PKR)"] = pd.to_numeric(contrib_df["Investment Return (PKR)"], errors="coerce").fillna(0).round(0)
+    contrib_df.columns = [
+        "Account", "Contribution (PKR)", "Investment Return (PKR)", "Inflation Floor (PKR)"
+    ]
+    for col in ["Contribution (PKR)", "Investment Return (PKR)", "Inflation Floor (PKR)"]:
+        contrib_df[col] = pd.to_numeric(contrib_df[col], errors="coerce").fillna(0).round(0)
     block_f = contrib_df.reset_index(drop=True)
 
     return {
