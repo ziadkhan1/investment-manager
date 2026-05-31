@@ -413,18 +413,12 @@ function renderContribution(vr) {
     ])
   );
 
-  const makeLabel = (i) => {
-    const ng = nomReturn[i];
-    const rg = realGain[i];
-    return [
-      `${ng >= 0 ? '+' : ''}${fmtN(ng)} nominal`,
-      `${rg >= 0 ? '+' : ''}${fmtN(rg)} real`,
-    ];
-  };
+  const sgn = (v) => (v >= 0 ? '+' : '') + fmtPKR(v);
+  const makeLabel = (i) => [`${sgn(nomReturn[i])} nom`, `${sgn(realGain[i])} real`];
 
   const labelCfg = {
-    anchor: 'end', align: 'right', padding: { left: 8 },
-    color: '#94A3B8', font: { size: 9 },
+    anchor: 'end', align: 'right', padding: { left: 6 },
+    color: '#94A3B8', font: { size: 8 },
     formatter: (_, ctx) => makeLabel(ctx.dataIndex),
   };
 
@@ -459,7 +453,7 @@ function renderContribution(vr) {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { right: 110 } },
+      layout: { padding: { right: 80 } },
       plugins: {
         legend: legend('top'),
         annotation: { annotations },

@@ -227,6 +227,24 @@ header {
   height: 230px;
 }
 
+.chart-wrap-row1 {
+  height: 230px;
+  position: relative;
+}
+
+/* ── First-row split layout ──────────────────────────────────────────────── */
+.row-split {
+  display: flex;
+  gap: .875rem;
+  align-items: stretch;
+}
+.col-wide   { flex: 2; min-width: 0; }
+.col-narrow { flex: 1; min-width: 0; }
+
+@media (max-width: 600px) {
+  .row-split { flex-direction: column; }
+}
+
 /* ── Loading overlay ───────────────────────────────────────────────────────── */
 .loading-overlay {
   position: fixed;

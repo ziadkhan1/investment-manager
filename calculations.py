@@ -352,11 +352,13 @@ def compute_inflation_rankings(
         cost_tx = acct_tx[
             acct_tx["transactionTypeID"].isin([2, 5]) & (acct_tx["amount_pkr"] > 0)
         ]
+        # net_tx: all transfers in/out — net gives true PKR at risk after redemptions
+        net_tx = acct_tx[acct_tx["transactionTypeID"].isin([2, 5])]
         if len(cost_tx):
             tx_cpis      = cost_tx["period"].apply(
                 lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today)
             )
-            nominal_cost = round(cost_tx["amount_pkr"].sum(), 2)
+            nominal_cost = round(net_tx["amount_pkr"].sum(), 2)
             real_cost    = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
             infl_adj_val = round((cost_tx["amount_pkr"] * (cpi_today / tx_cpis)).sum(), 2)
         else:
