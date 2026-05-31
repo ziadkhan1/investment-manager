@@ -98,12 +98,24 @@ async function batchGet(ranges) {
   return res.json();
 }
 
-function parseBlock(valueRange) {
+// Current month cap: "YYYY-MM" — never show data beyond the month we're in
+const NOW_MONTH = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+})();
+
+const IS_MONTH = (v) => /^\d{4}-\d{2}$/.test(v);
+
+function parseBlock(valueRange, monthOnly = false) {
   const rows = valueRange?.values || [];
   if (rows.length < 2) return { headers: [], rows: [] };
   return {
     headers: rows[0],
-    rows: rows.slice(1).filter((r) => r[0] !== undefined && r[0] !== ''),
+    rows: rows.slice(1).filter((r) => {
+      if (r[0] === undefined || r[0] === '') return false;
+      if (monthOnly) return IS_MONTH(r[0]) && r[0] <= NOW_MONTH;
+      return true;
+    }),
   };
 }
 
@@ -146,9 +158,26 @@ function legend(position = 'bottom') {
   return { position, labels: { color: '#94A3B8', font: { size: 10 }, boxWidth: 10, padding: 12 } };
 }
 
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+
+// Data-label plugin: show value only on the LAST point of each dataset
+const LAST_POINT_LABELS = {
+  datalabels: {
+    align: 'top',
+    anchor: 'end',
+    color: '#CBD5E1',
+    font: { size: 9, weight: '600' },
+    formatter: (v, ctx) => {
+      const last = ctx.dataset.data.length - 1;
+      return ctx.dataIndex === last ? fmtPKR(v) : null;
+    },
+    offset: 2,
+  },
+};
+
 // ── Chart 1: Real vs Nominal Net Worth ────────────────────────────────────────
 function renderNW(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
   const labels  = rows.map((r) => fmtMonth(r[0]));
@@ -164,6 +193,7 @@ function renderNW(vr) {
 
   mkChart('chart-nw', {
     type: 'line',
+    plugins: [ChartDataLabels],
     data: {
       labels,
       datasets: [
@@ -173,6 +203,7 @@ function renderNW(vr) {
           borderColor: c('blue', '.9'),
           backgroundColor: c('blue', '.08'),
           fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 5,
+          datalabels: LAST_POINT_LABELS.datalabels,
         },
         {
           label: 'Real NW (Inflation-Adj)',
@@ -180,12 +211,13 @@ function renderNW(vr) {
           borderColor: c('green', '.9'),
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
+          datalabels: LAST_POINT_LABELS.datalabels,
         },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend() },
+      plugins: { legend: legend(), datalabels: { display: false } },
       scales: { x: xAxis(), y: yAxis() },
     },
   });
@@ -193,7 +225,7 @@ function renderNW(vr) {
 
 // ── Chart 2: Monthly Income vs Expenses ───────────────────────────────────────
 function renderCashFlow(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
   const labels   = rows.map((r) => fmtMonth(r[0]));
@@ -221,7 +253,7 @@ function renderCashFlow(vr) {
 
 // ── Chart 3: Asset Allocation (stacked bars) ──────────────────────────────────
 function renderAllocation(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
   const labels = rows.map((r) => fmtMonth(r[0]));
@@ -253,7 +285,7 @@ function renderAllocation(vr) {
 
 // ── Chart 4: Currency Exposure (stacked bars: Hard vs PKR) ───────────────────
 function renderExposure(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
   const labels = rows.map((r) => fmtMonth(r[0]));
@@ -282,7 +314,7 @@ function renderExposure(vr) {
 
 // ── Chart 5: Growth Attribution (NW line vs Savings baseline) ────────────────
 function renderGrowth(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
   const labels  = rows.map((r) => fmtMonth(r[0]));
