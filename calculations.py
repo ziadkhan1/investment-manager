@@ -356,11 +356,11 @@ def compute_inflation_rankings(
             tx_cpis      = cost_tx["period"].apply(
                 lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today)
             )
+            nominal_cost = round(cost_tx["amount_pkr"].sum(), 2)
             real_cost    = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
-            # Sum of each deposit × (cpi_today / cpi_at_deposit): the PKR you would need
-            # today to have the same purchasing power as when each deposit was made.
             infl_adj_val = round((cost_tx["amount_pkr"] * (cpi_today / tx_cpis)).sum(), 2)
         else:
+            nominal_cost = 0.0
             real_cost    = 0.0
             infl_adj_val = 0.0
         all_time  = round(current_bal / real_cost, 4) if abs(real_cost) > 0.01 else ""
@@ -369,6 +369,7 @@ def compute_inflation_rankings(
         invest_rows.append({
             "Account":                    name,
             "Current Balance (PKR)":      round(current_bal, 2),
+            "Nominal Deposits (PKR)":     nominal_cost,
             "Real Cost Basis (PKR)":      real_cost,
             "All-Time Beat":              all_time,
             **_period_beats(name, current_bal),
@@ -423,6 +424,7 @@ def compute_inflation_rankings(
     total_row = pd.DataFrame([{
         "Account":                    "TOTAL NET WORTH",
         "Current Balance (PKR)":      total_pkr,
+        "Nominal Deposits (PKR)":     "",
         "Real Cost Basis (PKR)":      net_real_cost,
         "All-Time Beat":              total_ratio,
         **total_period_cols,
@@ -574,13 +576,17 @@ def compute_dashboard_data(
         (rankings["Account"] != "TOTAL NET WORTH") &
         rankings["Real Gain/Loss (PKR)"].apply(lambda x: x != "" and pd.notna(x))
     ].copy()
+    contrib_df["Nominal Return (PKR)"] = (
+        pd.to_numeric(contrib_df["Current Balance (PKR)"], errors="coerce") -
+        pd.to_numeric(contrib_df["Nominal Deposits (PKR)"], errors="coerce")
+    )
     contrib_df = contrib_df[
-        ["Account", "Real Cost Basis (PKR)", "Real Gain/Loss (PKR)", "Inflation-Adj. Value (PKR)"]
+        ["Account", "Nominal Deposits (PKR)", "Nominal Return (PKR)", "Inflation-Adj. Value (PKR)"]
     ].copy()
     contrib_df.columns = [
-        "Account", "Contribution (PKR)", "Investment Return (PKR)", "Inflation Floor (PKR)"
+        "Account", "Nominal Deposits (PKR)", "Nominal Return (PKR)", "Inflation Floor (PKR)"
     ]
-    for col in ["Contribution (PKR)", "Investment Return (PKR)", "Inflation Floor (PKR)"]:
+    for col in ["Nominal Deposits (PKR)", "Nominal Return (PKR)", "Inflation Floor (PKR)"]:
         contrib_df[col] = pd.to_numeric(contrib_df[col], errors="coerce").fillna(0).round(0)
     block_f = contrib_df.reset_index(drop=True)
 

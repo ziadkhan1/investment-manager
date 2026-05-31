@@ -368,18 +368,25 @@ function renderGrowth(vr) {
 
 // ── Chart 6: Return vs Contribution (horizontal stacked bar) ──────────────────
 function renderContribution(vr) {
-  const { rows } = parseBlock(vr);
+  const { rows }  = parseBlock(vr);
   if (!rows.length) return;
 
-  const labels        = rows.map((r) => r[0]);
-  const contrib       = rows.map((r) => parseFloat(r[1]) || 0);
-  const returns       = rows.map((r) => parseFloat(r[2]) || 0);
-  // col 3: PKR needed today to match the purchasing power of each historical deposit
-  const inflFloor     = rows.map((r) => parseFloat(r[3]) || 0);
-  // % of real cost basis returned
-  const retPct        = contrib.map((b, i) => b > 0 ? (returns[i] / b * 100) : 0);
+  const labels    = rows.map((r) => r[0]);
+  const nominal   = rows.map((r) => parseFloat(r[1]) || 0);  // actual PKR deposited
+  const nomReturn = rows.map((r) => parseFloat(r[2]) || 0);  // current value − nominal (signed)
+  const inflFloor = rows.map((r) => parseFloat(r[3]) || 0);  // CPI-adjusted deposit value today
 
-  // One vertical annotation per account: dashed grey line at the CPI-inflated cost floor
+  const currentBal = nominal.map((n, i) => n + nomReturn[i]);
+  const realGain   = currentBal.map((b, i) => b - inflFloor[i]);
+
+  // Gain:  blue = nominal deposits,   green extends to current value
+  // Loss:  blue = current value,      red extends to nominal deposits
+  const blueData  = nominal.map((n, i) => nomReturn[i] >= 0 ? n : currentBal[i]);
+  const greenData = nomReturn.map((r) => Math.max(r, 0));
+  const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
+
+  const xMax = Math.max(...currentBal, ...inflFloor) * 1.06;
+
   const annotations = Object.fromEntries(
     inflFloor.map((floor, i) => [
       `floor${i}`,
@@ -406,50 +413,53 @@ function renderContribution(vr) {
     ])
   );
 
+  const makeLabel = (i) => {
+    const ng = nomReturn[i];
+    const rg = realGain[i];
+    return [
+      `${ng >= 0 ? '+' : ''}${fmtN(ng)} nominal`,
+      `${rg >= 0 ? '+' : ''}${fmtN(rg)} real`,
+    ];
+  };
+
+  const labelCfg = {
+    anchor: 'end', align: 'right', padding: { left: 8 },
+    color: '#94A3B8', font: { size: 9 },
+    formatter: (_, ctx) => makeLabel(ctx.dataIndex),
+  };
+
   mkChart('chart-contribution', {
     type: 'bar',
     data: {
       labels,
       datasets: [
         {
-          label: 'Cost Basis (Real)',
-          data:  contrib,
+          label: 'Invested',
+          data:  blueData,
           backgroundColor: c('blue', '.65'),
           stack: 'rc',
-          datalabels: {
-            display:   (ctx) => contrib[ctx.dataIndex] > 0,
-            anchor:    'center',
-            align:     'center',
-            color:     'rgba(255,255,255,.55)',
-            font:      { size: 9 },
-            formatter: (v) => fmtN(v),
-          },
+          datalabels: { display: false },
         },
         {
-          label: 'Investment Return',
-          data:  returns,
-          backgroundColor: (ctx) =>
-            (returns[ctx.dataIndex] ?? 0) >= 0 ? c('green', '.80') : c('red', '.80'),
+          label: 'Profit',
+          data:  greenData,
+          backgroundColor: c('green', '.80'),
           stack: 'rc',
-          datalabels: {
-            display:   (ctx) => Math.abs(retPct[ctx.dataIndex]) > 0.05,
-            anchor:    'end',
-            align:     'right',
-            padding:   { left: 6 },
-            color:     (ctx) => retPct[ctx.dataIndex] >= 0 ? '#34d399' : '#f87171',
-            font:      { size: 11, weight: '700' },
-            formatter: (_, ctx) => {
-              const p = retPct[ctx.dataIndex];
-              return (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
-            },
-          },
+          datalabels: { ...labelCfg, display: (ctx) => greenData[ctx.dataIndex] > 0 },
+        },
+        {
+          label: 'Loss',
+          data:  redData,
+          backgroundColor: c('red', '.80'),
+          stack: 'rc',
+          datalabels: { ...labelCfg, display: (ctx) => redData[ctx.dataIndex] > 0 },
         },
       ],
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { right: 64 } },
+      layout: { padding: { right: 110 } },
       plugins: {
         legend: legend('top'),
         annotation: { annotations },
@@ -457,10 +467,10 @@ function renderContribution(vr) {
           callbacks: {
             label: (item) => {
               const i = item.dataIndex;
-              if (item.datasetIndex === 0)
-                return ` Cost Basis: PKR ${fmtN(item.raw)}`;
-              const p = retPct[i];
-              return ` Return: PKR ${fmtN(item.raw)}  (${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`;
+              const rg = realGain[i];
+              if (item.datasetIndex === 0) return ` Invested: PKR ${fmtN(nominal[i])}`;
+              if (item.datasetIndex === 1) return ` Profit: PKR ${fmtN(nomReturn[i])}  |  Real gain: PKR ${fmtN(rg)}`;
+              return ` Loss: PKR ${fmtN(nomReturn[i])}  |  Real gain: PKR ${fmtN(rg)}`;
             },
           },
         },
@@ -468,6 +478,7 @@ function renderContribution(vr) {
       scales: {
         x: {
           stacked: true,
+          max:     xMax,
           ticks:   { ...TICK, callback: (v) => fmtN(v) },
           grid:    GRID_Y,
         },
