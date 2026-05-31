@@ -425,3 +425,162 @@ def compute_inflation_rankings(
     }])
 
     return pd.concat([result_df, total_row], ignore_index=True)
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+def compute_dashboard_data(
+    monthly_df: pd.DataFrame,
+    tx,
+    accounts,
+    summary: pd.DataFrame,
+    rankings: pd.DataFrame,
+    hist_rates: dict,
+) -> dict:
+    """
+    Computes six data blocks for the Dashboard sheet:
+      block_a — Real vs Nominal Net Worth timeline
+      block_b — Monthly income, expenses, and savings rate
+      block_c — Asset allocation by category (stacked area)
+      block_d — Hard currency vs PKR exposure (stacked area)
+      block_e — Growth attribution: cumulative savings vs total net worth
+      block_f — Return vs contribution per investment account (bar)
+    """
+    months_list  = sorted(monthly_df["Month"].unique())
+    cpi_series   = build_cpi_series(months_list, hist_rates)
+    latest_month = months_list[-1]
+    cpi_today    = cpi_series.get(latest_month, 100)
+
+    invest_ids = set(
+        accounts.loc[
+            accounts["accountTypeName"].str.contains("invest", case=False, na=False) |
+            (accounts["accountCurrency"] != "PKR"),
+            "accountsTableID",
+        ].tolist()
+    ) | {GOLD_ACCOUNT_ID}
+    non_invest_ids = set(accounts["accountsTableID"].tolist()) - invest_ids
+
+    # Pre-compute per-transaction month label and CPI adjustment once
+    tx_w = tx.copy()
+    tx_w["month_str"]    = tx_w["period"].apply(lambda p: p.strftime("%Y-%m"))
+    tx_w["cpi_adj_amt"]  = (
+        tx_w["period"].apply(lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today))
+        / cpi_today
+        * tx_w["amount_pkr"]
+    )
+
+    # ── Block A: Real vs Nominal Net Worth ────────────────────────────────────
+    block_a = summary[["Month", "Net Worth (PKR)", "Real Net Worth (PKR)"]].copy()
+    block_a.columns = ["Month", "Nominal NW (PKR)", "Real NW (PKR)"]
+
+    # ── Block B: Monthly Income, Expenses, Savings Rate ───────────────────────
+    income_m  = (
+        tx_w[(tx_w["transactionTypeID"] == 4) & tx_w["accountID"].isin(non_invest_ids)]
+        .groupby("month_str")["amount_pkr"].sum()
+    )
+    expense_m = (
+        tx_w[tx_w["transactionTypeID"] == 3]
+        .groupby("month_str")["amount_pkr"].sum()
+        .abs()
+    )
+    cf_rows = []
+    for month in months_list:
+        inc  = income_m.get(month, 0.0)
+        exp  = expense_m.get(month, 0.0)
+        net  = inc - exp
+        rate = round(net / inc * 100, 1) if inc > 0.01 else 0.0
+        cf_rows.append({
+            "Month":            month,
+            "Income (PKR)":     round(inc, 0),
+            "Expenses (PKR)":   round(exp, 0),
+            "Net Savings (PKR)": round(net, 0),
+            "Savings Rate (%)": rate,
+        })
+    block_b = pd.DataFrame(cf_rows)
+
+    # ── Block C: Asset Allocation by Category ────────────────────────────────
+    def _cat(row):
+        if row["accountsTableID"] == GOLD_ACCOUNT_ID:
+            return "Gold"
+        if row["accountCurrency"] in ("GBP", "USD"):
+            return "Foreign Currency"
+        gn = str(row.get("accountGroupName", "")).lower()
+        tn = str(row.get("accountTypeName",  "")).lower()
+        if "liab" in gn or "payabl" in tn:
+            return "Liabilities"
+        if "receiv" in tn or str(row.get("accountName", "")).lower() == "receivables":
+            return "Receivables"
+        if "invest" in tn:
+            return "Investments"
+        return "Cash/PKR"
+
+    accts_c      = accounts.copy()
+    accts_c["category"] = accts_c.apply(_cat, axis=1)
+    name_to_cat  = dict(zip(accts_c["accountName"], accts_c["category"]))
+    ASSET_CATS   = ["Cash/PKR", "Investments", "Foreign Currency", "Gold", "Receivables"]
+
+    alloc_rows = []
+    for month in months_list:
+        m_df = monthly_df[monthly_df["Month"] == month].copy()
+        m_df["category"] = m_df["Account"].map(name_to_cat)
+        row = {"Month": month}
+        for cat in ASSET_CATS:
+            row[cat] = round(m_df[m_df["category"] == cat]["Balance (PKR)"].sum(), 0)
+        alloc_rows.append(row)
+    block_c = pd.DataFrame(alloc_rows)
+
+    # ── Block D: Hard Currency vs PKR Exposure ────────────────────────────────
+    exp_rows = []
+    for _, ar in block_c.iterrows():
+        hard  = ar["Foreign Currency"] + ar["Gold"]
+        pkr_a = ar["Cash/PKR"] + ar["Investments"] + ar["Receivables"]
+        exp_rows.append({
+            "Month":                ar["Month"],
+            "Hard Currency (PKR)":  round(hard,  0),
+            "PKR Assets (PKR)":     round(pkr_a, 0),
+        })
+    block_d = pd.DataFrame(exp_rows)
+
+    # ── Block E: Growth Attribution (cumulative, CPI-real) ────────────────────
+    inc_cum = (
+        tx_w[(tx_w["transactionTypeID"] == 4) & tx_w["accountID"].isin(non_invest_ids)]
+        .groupby("month_str")["cpi_adj_amt"].sum()
+    )
+    exp_cum = (
+        tx_w[tx_w["transactionTypeID"] == 3]
+        .groupby("month_str")["cpi_adj_amt"].sum()
+    )
+
+    attr_rows    = []
+    cum_savings  = 0.0
+    for month in months_list:
+        cum_savings += inc_cum.get(month, 0.0) + exp_cum.get(month, 0.0)
+        actual_nw   = monthly_df[monthly_df["Month"] == month]["Balance (PKR)"].sum()
+        attr_rows.append({
+            "Month":                   month,
+            "Net Worth (PKR)":         round(actual_nw, 0),
+            "Cumulative Savings (PKR)": round(max(cum_savings, 0), 0),
+        })
+    block_e = pd.DataFrame(attr_rows)
+
+    # ── Block F: Return vs Contribution per Investment Account ────────────────
+    contrib_df = rankings[
+        (rankings["Account"] != "TOTAL NET WORTH") &
+        rankings["Real Gain/Loss (PKR)"].apply(lambda x: x != "" and pd.notna(x))
+    ].copy()
+    contrib_df = contrib_df[
+        ["Account", "Real Cost Basis (PKR)", "Real Gain/Loss (PKR)"]
+    ].copy()
+    contrib_df.columns = ["Account", "Contribution (PKR)", "Investment Return (PKR)"]
+    contrib_df["Contribution (PKR)"]      = pd.to_numeric(contrib_df["Contribution (PKR)"],      errors="coerce").fillna(0).round(0)
+    contrib_df["Investment Return (PKR)"] = pd.to_numeric(contrib_df["Investment Return (PKR)"], errors="coerce").fillna(0).round(0)
+    block_f = contrib_df.reset_index(drop=True)
+
+    return {
+        "block_a": block_a,
+        "block_b": block_b,
+        "block_c": block_c,
+        "block_d": block_d,
+        "block_e": block_e,
+        "block_f": block_f,
+    }

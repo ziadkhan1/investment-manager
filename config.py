@@ -34,6 +34,7 @@ ACCOUNT_ANALYSIS_SHEET = "Account Analysis"
 ACCOUNT_PKR_SHEET      = "Account Values"
 INFLATION_RANKINGS_SHEET = "Inflation Rankings"
 TRANSACTIONS_SHEET     = "Transactions"
+DASHBOARD_SHEET        = "Dashboard"
 
 # ── Pakistan annual CPI inflation rates (%). Source: SBP / PBS. ───────────────
 PAKISTAN_ANNUAL_INFLATION = {

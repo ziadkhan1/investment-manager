@@ -5,11 +5,21 @@ import pandas as pd
 from config import (
     MONTHLY_SHEET, RATES_SHEET, ANALYSIS_SHEET,
     ACCOUNT_ANALYSIS_SHEET, ACCOUNT_PKR_SHEET, INFLATION_RANKINGS_SHEET,
-    TRANSACTIONS_SHEET,
+    TRANSACTIONS_SHEET, DASHBOARD_SHEET,
 )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _col_letter(idx: int) -> str:
+    """Convert 0-based column index to spreadsheet letter (0→A, 25→Z, 26→AA)."""
+    s = ""
+    idx += 1
+    while idx > 0:
+        idx, r = divmod(idx - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
 
 def _get_or_add_sheet(sheets_service, spreadsheet_id, title) -> int:
     meta = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
@@ -592,3 +602,162 @@ def write_transactions_sheet(sheets_service, spreadsheet_id, tx, accounts):
     ).execute()
 
     print(f"  Transactions: {len(rows)} rows written.")
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
+    """
+    Writes a Dashboard sheet with 6 charts arranged in a 2×3 grid:
+      Row 1 — Real vs Nominal Net Worth  |  Monthly Income vs Expenses
+      Row 2 — Asset Allocation           |  Hard Currency Exposure
+      Row 3 — Growth Attribution         |  Return vs Contribution
+    Data tables that back the charts are written below row 66.
+    """
+    sheet_id = _get_or_add_sheet(sheets_service, spreadsheet_id, DASHBOARD_SHEET)
+    _clear_charts(sheets_service, spreadsheet_id, sheet_id)
+    sheets_service.spreadsheets().values().clear(
+        spreadsheetId=spreadsheet_id, range=f"{DASHBOARD_SHEET}!A:Z",
+    ).execute()
+
+    block_a = dashboard_data["block_a"]  # Month | Nominal NW | Real NW
+    block_b = dashboard_data["block_b"]  # Month | Income | Expenses | Net Savings | Rate
+    block_c = dashboard_data["block_c"]  # Month | Cash/PKR | Investments | FX | Gold | Receivables
+    block_d = dashboard_data["block_d"]  # Month | Hard Currency (PKR) | PKR Assets (PKR)
+    block_e = dashboard_data["block_e"]  # Month | Net Worth | Cumulative Savings
+    block_f = dashboard_data["block_f"]  # Account | Contribution | Investment Return
+
+    n_months   = len(block_a)
+    DATA_START = 66                          # 0-based row; rows 0-65 reserved for chart area
+    BLOCK2_ROW = DATA_START + n_months + 3  # 0-based; where block_f (per-account) goes
+
+    # Column offsets (0-based) — each block occupies a contiguous column range
+    CA = 0   # block_a: cols 0-2   (Month, Nominal NW, Real NW)
+    CB = 4   # block_b: cols 4-8   (Month, Income, Expenses, Savings, Rate)
+    CC = 10  # block_c: cols 10-15 (Month + 5 categories)
+    CD = 17  # block_d: cols 17-19 (Month, Hard, PKR)
+    CE = 21  # block_e: cols 21-23 (Month, Net Worth, Savings)
+
+    def _write_block(df, row0, col0):
+        rows = [list(df.columns)] + [
+            [("" if (v is None or (isinstance(v, float) and pd.isna(v))) else v) for v in row]
+            for row in df.itertuples(index=False)
+        ]
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=f"{DASHBOARD_SHEET}!{_col_letter(col0)}{row0 + 1}",
+            valueInputOption="RAW",
+            body={"values": rows},
+        ).execute()
+
+    _write_block(block_a, DATA_START, CA)
+    _write_block(block_b, DATA_START, CB)
+    _write_block(block_c, DATA_START, CC)
+    _write_block(block_d, DATA_START, CD)
+    _write_block(block_e, DATA_START, CE)
+    if len(block_f) > 0:
+        _write_block(block_f, BLOCK2_ROW, 0)
+
+    # ── Source range builders ─────────────────────────────────────────────────
+    def _ts(col_s, col_e):
+        """Time-series range: DATA_START header + n_months data rows."""
+        return {"sourceRange": {"sources": [{
+            "sheetId":          sheet_id,
+            "startRowIndex":    DATA_START,
+            "endRowIndex":      DATA_START + n_months + 1,
+            "startColumnIndex": col_s,
+            "endColumnIndex":   col_e,
+        }]}}
+
+    def _bf(col_s, col_e):
+        """Block-F range: per-account rows."""
+        return {"sourceRange": {"sources": [{
+            "sheetId":          sheet_id,
+            "startRowIndex":    BLOCK2_ROW,
+            "endRowIndex":      BLOCK2_ROW + len(block_f) + 1,
+            "startColumnIndex": col_s,
+            "endColumnIndex":   col_e,
+        }]}}
+
+    def _chart(title, chart_type, domain_src, series_srcs,
+               anchor_row, anchor_col, y_label="", x_label="Month", stacked=False,
+               series_axis="LEFT_AXIS"):
+        spec = {
+            "chartType":      chart_type,
+            "legendPosition": "BOTTOM_LEGEND",
+            "axis": [
+                {"position": "BOTTOM_AXIS", "title": x_label},
+                {"position": "LEFT_AXIS",   "title": y_label},
+            ],
+            "domains": [{"domain": domain_src}],
+            "series": [{"series": s, "targetAxis": series_axis} for s in series_srcs],
+            "headerCount": 1,
+        }
+        if stacked:
+            spec["stackedType"] = "STACKED"
+        return {"addChart": {"chart": {
+            "spec": {"title": title, "basicChart": spec},
+            "position": {"overlayPosition": {
+                "anchorCell": {
+                    "sheetId":     sheet_id,
+                    "rowIndex":    anchor_row,
+                    "columnIndex": anchor_col,
+                },
+                "widthPixels":  680,
+                "heightPixels": 360,
+            }},
+        }}}
+
+    requests = [
+        # Row 1, left: Real vs Nominal Net Worth
+        _chart(
+            "Real vs Nominal Net Worth", "LINE",
+            _ts(CA, CA+1),
+            [_ts(CA+1, CA+2), _ts(CA+2, CA+3)],
+            anchor_row=1, anchor_col=0, y_label="PKR",
+        ),
+        # Row 1, right: Monthly Income vs Expenses
+        _chart(
+            "Monthly Income vs Expenses", "LINE",
+            _ts(CB, CB+1),
+            [_ts(CB+1, CB+2), _ts(CB+2, CB+3), _ts(CB+3, CB+4)],
+            anchor_row=1, anchor_col=9, y_label="PKR",
+        ),
+        # Row 2, left: Asset Allocation (stacked area)
+        _chart(
+            "Asset Allocation Over Time", "AREA",
+            _ts(CC, CC+1),
+            [_ts(CC+i, CC+i+1) for i in range(1, 6)],
+            anchor_row=22, anchor_col=0, y_label="PKR", stacked=True,
+        ),
+        # Row 2, right: Hard Currency Exposure (stacked area: Hard + PKR = total assets)
+        _chart(
+            "Currency Exposure (Hard vs PKR Assets)", "AREA",
+            _ts(CD, CD+1),
+            [_ts(CD+1, CD+2), _ts(CD+2, CD+3)],
+            anchor_row=22, anchor_col=9, y_label="PKR", stacked=True,
+        ),
+        # Row 3, left: Growth Attribution — Net Worth vs Savings baseline
+        _chart(
+            "Net Worth vs Savings Invested (Real PKR)", "LINE",
+            _ts(CE, CE+1),
+            [_ts(CE+1, CE+2), _ts(CE+2, CE+3)],
+            anchor_row=43, anchor_col=0, y_label="PKR (Real)",
+        ),
+    ]
+
+    # Row 3, right: Return vs Contribution per account (horizontal stacked bars)
+    if len(block_f) > 0:
+        requests.append(_chart(
+            "Return vs Contribution (Investment Accounts)", "BAR",
+            _bf(0, 1),
+            [_bf(1, 2), _bf(2, 3)],
+            anchor_row=43, anchor_col=9, y_label="PKR (Real)",
+            x_label="Account", stacked=True, series_axis="BOTTOM_AXIS",
+        ))
+
+    sheets_service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id, body={"requests": requests},
+    ).execute()
+
+    print(f"  Dashboard: {len(requests)} charts, {n_months} months of data.")

@@ -11,6 +11,8 @@ Bluecoins Net Worth Calculator
     "Account Analysis"  — per-account indexed charts (base=100)
     "Account Values"    — per-account raw PKR charts
     "Inflation Rankings"— per-account inflation beat ratio with color shading
+    "Transactions"      — every active transaction for auditing
+    "Dashboard"         — 6 CFA-style charts in a 2×3 grid
 """
 
 import os
@@ -26,6 +28,7 @@ from calculations import (
     compute_account_indices,
     compute_account_pkr_values,
     compute_inflation_rankings,
+    compute_dashboard_data,
 )
 from sheets_io import (
     load_historical_rates,
@@ -35,6 +38,7 @@ from sheets_io import (
     write_account_pkr_sheet,
     write_inflation_rankings_sheet,
     write_transactions_sheet,
+    write_dashboard_sheet,
     upsert_market_rates,
 )
 
@@ -81,7 +85,8 @@ def main():
         summary  = compute_summary(monthly)
         acct_analysis, active_accounts = compute_account_indices(monthly)
         acct_pkr, active_pkr           = compute_account_pkr_values(monthly, prices)
-        rankings = compute_inflation_rankings(monthly, tx, accounts, hist_rates)
+        rankings       = compute_inflation_rankings(monthly, tx, accounts, hist_rates)
+        dashboard_data = compute_dashboard_data(monthly, tx, accounts, summary, rankings, hist_rates)
 
         cur = summary.iloc[-1]
         print(f"\n  Net Worth {cur['Month']}:")
@@ -96,6 +101,7 @@ def main():
         write_account_pkr_sheet(sheets_service, spreadsheet_id, acct_pkr, active_pkr)
         write_inflation_rankings_sheet(sheets_service, spreadsheet_id, rankings)
         write_transactions_sheet(sheets_service, spreadsheet_id, tx, accounts)
+        write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data)
         today_cpi = fetched_cpi.get(date.today().strftime("%Y-%m"), "")
         upsert_market_rates(sheets_service, spreadsheet_id, prices, today_cpi)
 
