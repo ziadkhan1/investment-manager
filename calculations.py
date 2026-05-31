@@ -348,6 +348,8 @@ def compute_inflation_rankings(
         if latest_df.at[name, "Group"] == "Liabilities" or abs(current_bal) <= 100:
             continue
 
+        currency = acct["accountCurrency"]
+
         acct_tx = tx[tx["accountID"] == acct_id]
         cost_tx = acct_tx[
             acct_tx["transactionTypeID"].isin([2, 5]) & (acct_tx["amount_pkr"] > 0)
@@ -355,12 +357,29 @@ def compute_inflation_rankings(
         # net_tx: all transfers in/out — net gives true PKR at risk after redemptions
         net_tx = acct_tx[acct_tx["transactionTypeID"].isin([2, 5])]
         if len(cost_tx):
-            tx_cpis      = cost_tx["period"].apply(
+            tx_cpis = cost_tx["period"].apply(
                 lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today)
             )
-            nominal_cost = round(net_tx["amount_pkr"].sum(), 2)
-            real_cost    = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
-            infl_adj_val = round((cost_tx["amount_pkr"] * (cpi_today / tx_cpis)).sum(), 2)
+            if currency in ("GBP", "USD"):
+                # Use native units × historical market rate for that month so the
+                # cost basis reflects the exchange rate on the day of each deposit,
+                # not Bluecoins' internally stored PKR amount.
+                ck = currency.lower()
+
+                def _hist_pkr(row, _ck=ck):
+                    native = row["amount_pkr"] * row["conversionRateNew"]
+                    m      = row["period"].strftime("%Y-%m")
+                    rate   = hist_rates.get(m, {}).get(_ck) or prices[_ck]
+                    return native * rate
+
+                cost_pkr     = cost_tx.apply(_hist_pkr, axis=1)
+                nominal_cost = round(net_tx.apply(_hist_pkr, axis=1).sum(), 2)
+                real_cost    = round((cost_pkr * tx_cpis / cpi_today).sum(), 2)
+                infl_adj_val = round((cost_pkr * (cpi_today / tx_cpis)).sum(), 2)
+            else:
+                nominal_cost = round(net_tx["amount_pkr"].sum(), 2)
+                real_cost    = round((cost_tx["amount_pkr"] * tx_cpis / cpi_today).sum(), 2)
+                infl_adj_val = round((cost_tx["amount_pkr"] * (cpi_today / tx_cpis)).sum(), 2)
         else:
             nominal_cost = 0.0
             real_cost    = 0.0
