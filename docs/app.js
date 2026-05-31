@@ -5,7 +5,7 @@
 // Create one at: https://console.cloud.google.com → APIs & Services → Credentials
 // Authorized JavaScript origins must include: https://ziadkhan1.github.io
 const CFG = {
-  CLIENT_ID:      'PASTE_YOUR_OAUTH_CLIENT_ID_HERE.apps.googleusercontent.com',
+  CLIENT_ID:      '1087293102882-70tfiu2m7a21klc764rnu679fh79k5i3.apps.googleusercontent.com',
   SPREADSHEET_ID: '1jWXEWCwbgHggMLEU01Cgcg0fd0Ey4kL7PulBlgCQ3LE',
   SCOPES:         'https://www.googleapis.com/auth/spreadsheets.readonly',
   DATA_ROW:       67,   // 1-indexed sheet row where dashboard data tables start
