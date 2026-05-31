@@ -32,6 +32,9 @@ function fmtPKRFull(v) {
   return 'PKR ' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
+// Full integer with thousand separators — no K/M abbreviation
+const fmtN = (v) => Math.round(parseFloat(v) || 0).toLocaleString('en-US');
+
 function fmtMonth(s) {
   if (!s || !s.includes('-')) return s;
   const [y, m] = s.split('-');
@@ -371,8 +374,35 @@ function renderContribution(vr) {
   const labels  = rows.map((r) => r[0]);
   const contrib = rows.map((r) => parseFloat(r[1]) || 0);
   const returns = rows.map((r) => parseFloat(r[2]) || 0);
-  // % of cost basis returned (positive = gain, negative = loss)
+  // % of inflation-adjusted cost basis that was returned
   const retPct  = contrib.map((b, i) => b > 0 ? (returns[i] / b * 100) : 0);
+
+  // One vertical annotation per account marking the inflation-adjusted cost floor
+  const annotations = Object.fromEntries(
+    contrib.map((b, i) => [
+      `floor${i}`,
+      {
+        type:        'line',
+        xMin:        b,
+        xMax:        b,
+        yMin:        i - 0.46,
+        yMax:        i + 0.46,
+        borderColor: 'rgba(245,158,11,.95)',
+        borderWidth: 2.5,
+        borderDash:  [4, 3],
+        label: {
+          display:         i === 0,
+          content:         'Inflation floor',
+          position:        'start',
+          yAdjust:         -14,
+          color:           '#F59E0B',
+          font:            { size: 8, weight: '600' },
+          backgroundColor: 'transparent',
+          padding:         0,
+        },
+      },
+    ])
+  );
 
   mkChart('chart-contribution', {
     type: 'bar',
@@ -380,32 +410,32 @@ function renderContribution(vr) {
       labels,
       datasets: [
         {
-          label: 'Cost Basis',
-          data: contrib,
+          label: 'Cost Basis (Real)',
+          data:  contrib,
           backgroundColor: c('blue', '.65'),
           stack: 'rc',
           datalabels: {
-            display: true,
-            anchor: 'center',
-            align: 'center',
-            color: 'rgba(255,255,255,.55)',
-            font: { size: 9 },
-            formatter: (v) => v > 1000 ? fmtPKR(v) : '',
+            display:   (ctx) => contrib[ctx.dataIndex] > 0,
+            anchor:    'center',
+            align:     'center',
+            color:     'rgba(255,255,255,.55)',
+            font:      { size: 9 },
+            formatter: (v) => fmtN(v),
           },
         },
         {
           label: 'Investment Return',
-          data: returns,
+          data:  returns,
           backgroundColor: (ctx) =>
             (returns[ctx.dataIndex] ?? 0) >= 0 ? c('green', '.80') : c('red', '.80'),
           stack: 'rc',
           datalabels: {
-            display: (ctx) => Math.abs(retPct[ctx.dataIndex]) > 0.05,
-            anchor: 'end',
-            align: 'right',
-            padding: { left: 4 },
-            color: (ctx) => retPct[ctx.dataIndex] >= 0 ? '#34d399' : '#f87171',
-            font: { size: 10, weight: '700' },
+            display:   (ctx) => Math.abs(retPct[ctx.dataIndex]) > 0.05,
+            anchor:    'end',
+            align:     'right',
+            padding:   { left: 6 },
+            color:     (ctx) => retPct[ctx.dataIndex] >= 0 ? '#34d399' : '#f87171',
+            font:      { size: 11, weight: '700' },
             formatter: (_, ctx) => {
               const p = retPct[ctx.dataIndex];
               return (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
@@ -417,16 +447,18 @@ function renderContribution(vr) {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { right: 58 } },
+      layout: { padding: { right: 64 } },
       plugins: {
         legend: legend('top'),
+        annotation: { annotations },
         tooltip: {
           callbacks: {
             label: (item) => {
               const i = item.dataIndex;
-              if (item.datasetIndex === 0) return ` Cost Basis: PKR ${fmtPKR(item.raw)}`;
+              if (item.datasetIndex === 0)
+                return ` Cost Basis: PKR ${fmtN(item.raw)}`;
               const p = retPct[i];
-              return ` Return: PKR ${fmtPKR(item.raw)} (${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`;
+              return ` Return: PKR ${fmtN(item.raw)}  (${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`;
             },
           },
         },
@@ -434,13 +466,13 @@ function renderContribution(vr) {
       scales: {
         x: {
           stacked: true,
-          ticks: { ...TICK, callback: (v) => fmtPKR(v) },
-          grid: GRID_Y,
+          ticks:   { ...TICK, callback: (v) => fmtN(v) },
+          grid:    GRID_Y,
         },
         y: {
           stacked: true,
-          ticks: { color: '#94A3B8', font: { size: 10 } },
-          grid: GRID_X,
+          ticks:   { color: '#94A3B8', font: { size: 10 } },
+          grid:    GRID_X,
         },
       },
     },
