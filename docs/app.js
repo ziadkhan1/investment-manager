@@ -144,6 +144,9 @@ const GRID_X = { color: 'rgba(255,255,255,.03)' };
 const GRID_Y = { color: 'rgba(255,255,255,.06)' };
 const TICK   = { color: '#475569', font: { size: 10 } };
 
+// Disable datalabels globally; enable per-dataset where needed
+if (Chart.defaults.plugins?.datalabels) Chart.defaults.plugins.datalabels.display = false;
+
 function xAxis(extra = {}) {
   return { ticks: { ...TICK, maxRotation: 45, maxTicksLimit: 8 }, grid: GRID_X, ...extra };
 }
@@ -158,21 +161,15 @@ function legend(position = 'bottom') {
   return { position, labels: { color: '#94A3B8', font: { size: 10 }, boxWidth: 10, padding: 12 } };
 }
 
-// ── Chart helpers ─────────────────────────────────────────────────────────────
-
-// Data-label plugin: show value only on the LAST point of each dataset
-const LAST_POINT_LABELS = {
-  datalabels: {
-    align: 'top',
-    anchor: 'end',
-    color: '#CBD5E1',
-    font: { size: 9, weight: '600' },
-    formatter: (v, ctx) => {
-      const last = ctx.dataset.data.length - 1;
-      return ctx.dataIndex === last ? fmtPKR(v) : null;
-    },
-    offset: 2,
-  },
+// Per-dataset datalabels: show value only on the last point
+const lastPointLabel = {
+  display: (ctx) => ctx.dataIndex === ctx.dataset.data.length - 1,
+  align: 'top',
+  anchor: 'end',
+  color: '#CBD5E1',
+  font: { size: 9, weight: '600' },
+  formatter: (v) => fmtPKR(v),
+  offset: 2,
 };
 
 // ── Chart 1: Real vs Nominal Net Worth ────────────────────────────────────────
@@ -184,16 +181,12 @@ function renderNW(vr) {
   const nominal = rows.map((r) => parseFloat(r[1]) || 0);
   const real    = rows.map((r) => parseFloat(r[2]) || 0);
 
-  // Update header
   const latest = nominal[nominal.length - 1];
   $('nw-pkr').textContent = fmtPKRFull(latest);
-
-  const latestMonth = rows[rows.length - 1]?.[0] || '';
-  $('last-updated').textContent = 'As of\n' + latestMonth;
+  $('last-updated').textContent = 'As of\n' + (rows[rows.length - 1]?.[0] || '');
 
   mkChart('chart-nw', {
     type: 'line',
-    plugins: [ChartDataLabels],
     data: {
       labels,
       datasets: [
@@ -203,7 +196,7 @@ function renderNW(vr) {
           borderColor: c('blue', '.9'),
           backgroundColor: c('blue', '.08'),
           fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 5,
-          datalabels: LAST_POINT_LABELS.datalabels,
+          datalabels: lastPointLabel,
         },
         {
           label: 'Real NW (Inflation-Adj)',
@@ -211,13 +204,13 @@ function renderNW(vr) {
           borderColor: c('green', '.9'),
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
-          datalabels: LAST_POINT_LABELS.datalabels,
+          datalabels: lastPointLabel,
         },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend(), datalabels: { display: false } },
+      plugins: { legend: legend() },
       scales: { x: xAxis(), y: yAxis() },
     },
   });
@@ -378,20 +371,66 @@ function renderContribution(vr) {
   const labels  = rows.map((r) => r[0]);
   const contrib = rows.map((r) => parseFloat(r[1]) || 0);
   const returns = rows.map((r) => parseFloat(r[2]) || 0);
+  // % of cost basis returned (positive = gain, negative = loss)
+  const retPct  = contrib.map((b, i) => b > 0 ? (returns[i] / b * 100) : 0);
 
   mkChart('chart-contribution', {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Contribution (Real Cost Basis)', data: contrib, backgroundColor: c('blue', '.75'),  stack: 'rc' },
-        { label: 'Investment Return',              data: returns, backgroundColor: c('green', '.75'), stack: 'rc' },
+        {
+          label: 'Cost Basis',
+          data: contrib,
+          backgroundColor: c('blue', '.65'),
+          stack: 'rc',
+          datalabels: {
+            display: true,
+            anchor: 'center',
+            align: 'center',
+            color: 'rgba(255,255,255,.55)',
+            font: { size: 9 },
+            formatter: (v) => v > 1000 ? fmtPKR(v) : '',
+          },
+        },
+        {
+          label: 'Investment Return',
+          data: returns,
+          backgroundColor: (ctx) =>
+            (returns[ctx.dataIndex] ?? 0) >= 0 ? c('green', '.80') : c('red', '.80'),
+          stack: 'rc',
+          datalabels: {
+            display: (ctx) => Math.abs(retPct[ctx.dataIndex]) > 0.05,
+            anchor: 'end',
+            align: 'right',
+            padding: { left: 4 },
+            color: (ctx) => retPct[ctx.dataIndex] >= 0 ? '#34d399' : '#f87171',
+            font: { size: 10, weight: '700' },
+            formatter: (_, ctx) => {
+              const p = retPct[ctx.dataIndex];
+              return (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
+            },
+          },
+        },
       ],
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend('top') },
+      layout: { padding: { right: 58 } },
+      plugins: {
+        legend: legend('top'),
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const i = item.dataIndex;
+              if (item.datasetIndex === 0) return ` Cost Basis: PKR ${fmtPKR(item.raw)}`;
+              const p = retPct[i];
+              return ` Return: PKR ${fmtPKR(item.raw)} (${p >= 0 ? '+' : ''}${p.toFixed(1)}%)`;
+            },
+          },
+        },
+      },
       scales: {
         x: {
           stacked: true,
@@ -425,8 +464,12 @@ async function fetchAndRender() {
 
     const [vrA, vrB, vrC, vrD, vrE] = batch1.valueRanges;
 
-    // Block F row = DATA_ROW + n_months + 3 (mirrors Python BLOCK2_ROW calculation)
-    const nMonths  = Math.max((vrA.values?.length || 1) - 1, 1);
+    // Count only valid YYYY-MM rows (skip header + gap rows + block_f account rows
+    // that all land in the same unbounded A:C range we fetched above)
+    const nMonths  = Math.max(
+      (vrA.values || []).slice(1).filter((r) => r[0] && IS_MONTH(r[0]) && r[0] <= NOW_MONTH).length,
+      1,
+    );
     const blockFRow = R + nMonths + 3;
 
     const batch2 = await batchGet([`Dashboard!A${blockFRow}:C`]);
