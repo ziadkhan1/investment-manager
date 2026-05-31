@@ -378,6 +378,7 @@ function renderContribution(vr) {
 
   const currentBal = nominal.map((n, i) => n + nomReturn[i]);
   const realGain   = currentBal.map((b, i) => b - inflFloor[i]);
+  const realPct    = realGain.map((rg, i) => inflFloor[i] !== 0 ? (rg / Math.abs(inflFloor[i])) * 100 : 0);
 
   // Gain:  blue = nominal deposits,   green extends to current value
   // Loss:  blue = current value,      red extends to nominal deposits
@@ -413,8 +414,9 @@ function renderContribution(vr) {
     ])
   );
 
-  const sgn = (v) => (v >= 0 ? '+' : '−') + fmtPKR(Math.abs(v));
-  const makeLabel = (i) => [`${sgn(nomReturn[i])} nom`, `${sgn(realGain[i])} real`];
+  const sgn    = (v) => (v >= 0 ? '+' : '−') + fmtPKR(Math.abs(v));
+  const fmtPct = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
+  const makeLabel = (i) => [`${sgn(nomReturn[i])} nom`, `${fmtPct(realPct[i])} real`];
 
   const labelCfg = {
     anchor: 'end', align: 'right', padding: { left: 6 },
@@ -460,11 +462,11 @@ function renderContribution(vr) {
         tooltip: {
           callbacks: {
             label: (item) => {
-              const i  = item.dataIndex;
-              const rg = realGain[i];
-              const rgStr = rg >= 0
-                ? ` Real gain:  +PKR ${fmtN(rg)}`
-                : ` Real loss:   PKR ${fmtN(rg)}`;
+              const i   = item.dataIndex;
+              const rp  = realPct[i];
+              const rgStr = rp >= 0
+                ? ` Real gain:  +${Math.abs(rp).toFixed(1)}%`
+                : ` Real loss:   −${Math.abs(rp).toFixed(1)}%`;
               if (item.datasetIndex === 0) return ` Invested:   PKR ${fmtN(nominal[i])}`;
               if (item.datasetIndex === 1) return [` Profit:    +PKR ${fmtN(nomReturn[i])}`, rgStr];
               return [` Loss:       PKR ${fmtN(nomReturn[i])}`, rgStr];

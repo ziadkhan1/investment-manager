@@ -608,6 +608,15 @@ def compute_dashboard_data(
     ]
     for col in ["Nominal Deposits (PKR)", "Nominal Return (PKR)", "Inflation Floor (PKR)"]:
         contrib_df[col] = pd.to_numeric(contrib_df[col], errors="coerce").fillna(0).round(0)
+
+    # Sort by real % gain (current_balance - inflation_floor) / inflation_floor, highest first
+    _curr  = contrib_df["Nominal Deposits (PKR)"] + contrib_df["Nominal Return (PKR)"]
+    _infl  = contrib_df["Inflation Floor (PKR)"].abs().replace(0, float("nan"))
+    contrib_df = (
+        contrib_df.assign(_rpct=(_curr - _infl) / _infl)
+        .sort_values("_rpct", ascending=False)
+        .drop(columns=["_rpct"])
+    )
     block_f = contrib_df.reset_index(drop=True)
 
     return {
