@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0A0E1A" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Finance Dashboard</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- ── Sign-in screen ───────────────────────────────────────────────────── -->
+  <div id="signin-screen" class="screen active">
+    <div class="signin-content">
+      <div class="logo">📊</div>
+      <h1>Finance Dashboard</h1>
+      <p>Live view of your portfolio</p>
+      <button id="signin-btn" class="btn-primary">Sign in with Google</button>
+      <p class="hint">Use the Google account that has access to your Finance sheet</p>
+    </div>
+  </div>
+
+  <!-- ── Dashboard screen ─────────────────────────────────────────────────── -->
+  <div id="dashboard-screen" class="screen">
+
+    <header>
+      <div class="nw-block">
+        <span class="nw-label">Net Worth</span>
+        <span id="nw-pkr" class="nw-primary">—</span>
+        <span id="nw-usd" class="nw-secondary">—</span>
+      </div>
+      <div class="header-actions">
+        <span id="last-updated" class="last-updated"></span>
+        <button id="refresh-btn" class="btn-icon" title="Refresh">↻</button>
+      </div>
+    </header>
+
+    <main id="charts-container">
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">REAL vs NOMINAL NET WORTH</span>
+          <span class="card-badge line-badge">LINE</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-nw"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">MONTHLY INCOME vs EXPENSES</span>
+          <span class="card-badge line-badge">LINE</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-cashflow"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">ASSET ALLOCATION OVER TIME</span>
+          <span class="card-badge bar-badge">STACKED</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-allocation"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">CURRENCY EXPOSURE</span>
+          <span class="card-badge bar-badge">STACKED</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-exposure"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">NET WORTH vs SAVINGS INVESTED</span>
+          <span class="card-badge green-badge">REAL PKR</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-growth"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-header">
+          <span class="card-title">RETURN vs CONTRIBUTION</span>
+          <span class="card-badge bar-badge">PER ACCOUNT</span>
+        </div>
+        <div class="chart-wrap chart-wrap-tall"><canvas id="chart-contribution"></canvas></div>
+      </div>
+
+    </main>
+
+    <div id="loading" class="loading-overlay hidden">
+      <div class="spinner"></div>
+      <span class="loading-text">Loading portfolio…</span>
+    </div>
+
+    <div id="error-toast" class="toast hidden"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+  </script>
+
+</body>
+</html>
