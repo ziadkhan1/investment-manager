@@ -385,7 +385,7 @@ function renderContribution(vr) {
   const greenData = nomReturn.map((r) => Math.max(r, 0));
   const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
 
-  const xMax = Math.max(...currentBal, ...inflFloor) * 1.06;
+  const xMax = Math.max(...currentBal, ...inflFloor) * 1.30;
 
   const annotations = Object.fromEntries(
     inflFloor.map((floor, i) => [
@@ -413,7 +413,7 @@ function renderContribution(vr) {
     ])
   );
 
-  const sgn = (v) => (v >= 0 ? '+' : '') + fmtPKR(v);
+  const sgn = (v) => (v >= 0 ? '+' : '−') + fmtPKR(Math.abs(v));
   const makeLabel = (i) => [`${sgn(nomReturn[i])} nom`, `${sgn(realGain[i])} real`];
 
   const labelCfg = {
@@ -453,18 +453,19 @@ function renderContribution(vr) {
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { right: 80 } },
+      layout: { padding: { right: 4 } },
       plugins: {
         legend: legend('top'),
         annotation: { annotations },
         tooltip: {
           callbacks: {
             label: (item) => {
-              const i = item.dataIndex;
+              const i  = item.dataIndex;
               const rg = realGain[i];
+              const rgStr = (rg >= 0 ? `Real gain: +PKR ${fmtN(rg)}` : `Real loss: PKR ${fmtN(rg)}`);
               if (item.datasetIndex === 0) return ` Invested: PKR ${fmtN(nominal[i])}`;
-              if (item.datasetIndex === 1) return ` Profit: PKR ${fmtN(nomReturn[i])}  |  Real gain: PKR ${fmtN(rg)}`;
-              return ` Loss: PKR ${fmtN(nomReturn[i])}  |  Real gain: PKR ${fmtN(rg)}`;
+              if (item.datasetIndex === 1) return ` Profit: +PKR ${fmtN(nomReturn[i])}  |  ${rgStr}`;
+              return ` Loss: PKR ${fmtN(nomReturn[i])}  |  ${rgStr}`;
             },
           },
         },
