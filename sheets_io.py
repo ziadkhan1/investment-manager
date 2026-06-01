@@ -682,16 +682,20 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     def _chart(title, chart_type, domain_src, series_srcs,
                anchor_row, anchor_col, y_label="", x_label="Month", stacked=False,
                series_axis="LEFT_AXIS", line_style=False, subtitle=None):
+        # Use COMBO with explicit type:LINE per series so Google Sheets renders
+        # line segments (not filled rectangles) as legend icons.
         if line_style and chart_type == "LINE":
+            actual_type = "COMBO"
             series_list = [
                 {"series": s, "targetAxis": series_axis,
-                 "lineStyle": {"width": 2, "type": "SOLID"}}
+                 "type": "LINE", "lineStyle": {"width": 2, "type": "SOLID"}}
                 for s in series_srcs
             ]
         else:
+            actual_type = chart_type
             series_list = [{"series": s, "targetAxis": series_axis} for s in series_srcs]
         spec = {
-            "chartType":      chart_type,
+            "chartType":      actual_type,
             "legendPosition": "BOTTOM_LEGEND",
             "axis": [
                 {"position": "BOTTOM_AXIS", "title": x_label},
