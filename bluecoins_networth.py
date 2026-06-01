@@ -57,10 +57,14 @@ def main():
 
     qs_files = find_quick_sync_files(drive_service)
     if qs_files:
-        print(f"  Quick sync: {len(qs_files)} file(s) found, merging latest...")
-        qs_path = _download_fydb(drive_service, qs_files[0]["id"])
-        db_paths.append(qs_path)
-        print(f"  Merged: {qs_files[0]['name']}")
+        # Merge ALL quick sync files oldest-first so that drop_duplicates(keep="last")
+        # retains the most recent version of any transaction that appears in multiple files.
+        qs_files_asc = list(reversed(qs_files))
+        print(f"  Quick sync: {len(qs_files_asc)} file(s) found, merging all...")
+        for qs_file in qs_files_asc:
+            qs_path = _download_fydb(drive_service, qs_file["id"])
+            db_paths.append(qs_path)
+            print(f"  Merged: {qs_file['name']}")
 
     try:
         print("\n[2/4] Fetching live prices...")
@@ -85,7 +89,7 @@ def main():
         summary  = compute_summary(monthly)
         acct_analysis, active_accounts = compute_account_indices(monthly)
         acct_pkr, active_pkr           = compute_account_pkr_values(monthly, prices)
-        rankings       = compute_inflation_rankings(monthly, tx, accounts, hist_rates)
+        rankings       = compute_inflation_rankings(monthly, tx, accounts, hist_rates, prices)
         dashboard_data = compute_dashboard_data(monthly, tx, accounts, summary, rankings, hist_rates)
 
         cur = summary.iloc[-1]

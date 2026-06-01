@@ -260,7 +260,7 @@ def compute_account_indices(monthly_df: pd.DataFrame):
 
 
 def compute_inflation_rankings(
-    monthly_df: pd.DataFrame, tx, accounts, hist_rates: dict
+    monthly_df: pd.DataFrame, tx, accounts, hist_rates: dict, prices: dict
 ) -> pd.DataFrame:
     """
     Per-account inflation beat metrics for the latest month.
