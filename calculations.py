@@ -499,7 +499,7 @@ def compute_dashboard_data(
 
     # ── Block A: Real vs Nominal Net Worth ────────────────────────────────────
     block_a = summary[["Month", "Net Worth (PKR)", "Real Net Worth (PKR)"]].copy()
-    block_a.columns = ["Month", "Nominal NW (PKR)", "Real NW (PKR)"]
+    block_a.columns = ["Month", "Nominal Net Worth (PKR)", "Real Net Worth (PKR)"]
 
     # ── Block B: Monthly Income, Expenses, Savings Rate ───────────────────────
     income_m  = (
@@ -618,6 +618,13 @@ def compute_dashboard_data(
         .drop(columns=["_rpct"])
     )
     block_f = contrib_df.reset_index(drop=True)
+    _total = block_f["Nominal Deposits (PKR)"] + block_f["Nominal Return (PKR)"]
+    block_f["Total (PKR)"] = _total.round(0)
+    block_f["Total Label"] = _total.apply(
+        lambda v: (f"{v / 1_000_000:.1f}M" if abs(v) >= 1_000_000
+                   else f"{v / 1_000:.0f}K" if abs(v) >= 1_000
+                   else str(int(round(v))))
+    )
 
     return {
         "block_a": block_a,

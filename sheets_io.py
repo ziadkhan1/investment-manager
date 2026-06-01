@@ -611,7 +611,7 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     Writes a Dashboard sheet with 6 charts arranged in a 2×3 grid:
       Row 1 — Real vs Nominal Net Worth  |  Monthly Income vs Expenses
       Row 2 — Asset Allocation           |  Hard Currency Exposure
-      Row 3 — Growth Attribution         |  Return vs Contribution
+      Row 3 — Growth Attribution         |  Portfolio Health
     Data tables that back the charts are written below row 66.
     """
     sheet_id = _get_or_add_sheet(sheets_service, spreadsheet_id, DASHBOARD_SHEET)
@@ -681,7 +681,15 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
 
     def _chart(title, chart_type, domain_src, series_srcs,
                anchor_row, anchor_col, y_label="", x_label="Month", stacked=False,
-               series_axis="LEFT_AXIS"):
+               series_axis="LEFT_AXIS", line_style=False, subtitle=None):
+        if line_style and chart_type == "LINE":
+            series_list = [
+                {"series": s, "targetAxis": series_axis,
+                 "lineStyle": {"width": 2, "type": "SOLID"}}
+                for s in series_srcs
+            ]
+        else:
+            series_list = [{"series": s, "targetAxis": series_axis} for s in series_srcs]
         spec = {
             "chartType":      chart_type,
             "legendPosition": "BOTTOM_LEGEND",
@@ -690,13 +698,16 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
                 {"position": "LEFT_AXIS",   "title": y_label},
             ],
             "domains": [{"domain": domain_src}],
-            "series": [{"series": s, "targetAxis": series_axis} for s in series_srcs],
+            "series": series_list,
             "headerCount": 1,
         }
         if stacked:
             spec["stackedType"] = "STACKED"
+        chart_spec = {"title": title, "basicChart": spec}
+        if subtitle is not None:
+            chart_spec["subtitle"] = subtitle
         return {"addChart": {"chart": {
-            "spec": {"title": title, "basicChart": spec},
+            "spec": chart_spec,
             "position": {"overlayPosition": {
                 "anchorCell": {
                     "sheetId":     sheet_id,
@@ -715,6 +726,7 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
             _ts(CA, CA+1),
             [_ts(CA+1, CA+2), _ts(CA+2, CA+3)],
             anchor_row=1, anchor_col=0, y_label="PKR",
+            line_style=True, subtitle="",
         ),
         # Row 1, right: Monthly Income vs Expenses
         _chart(
@@ -722,6 +734,7 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
             _ts(CB, CB+1),
             [_ts(CB+1, CB+2), _ts(CB+2, CB+3), _ts(CB+3, CB+4)],
             anchor_row=1, anchor_col=9, y_label="PKR",
+            line_style=True, subtitle="",
         ),
         # Row 2, left: Asset Allocation (stacked area)
         _chart(
@@ -743,18 +756,60 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
             _ts(CE, CE+1),
             [_ts(CE+1, CE+2), _ts(CE+2, CE+3)],
             anchor_row=43, anchor_col=0, y_label="PKR (Real)",
+            line_style=True,
         ),
     ]
 
-    # Row 3, right: Return vs Contribution per account (horizontal stacked bars)
+    # Row 3, right: Portfolio Health — horizontal stacked bars with total labels
     if len(block_f) > 0:
-        requests.append(_chart(
-            "Return vs Contribution (Investment Accounts)", "BAR",
-            _bf(0, 1),
-            [_bf(1, 2), _bf(2, 3)],
-            anchor_row=43, anchor_col=9, y_label="PKR (Real)",
-            x_label="Account", stacked=True, series_axis="BOTTOM_AXIS",
-        ))
+        total_nums  = pd.to_numeric(block_f["Total (PKR)"], errors="coerce")
+        max_total   = float(total_nums.max()) if not total_nums.empty else 0
+        viewport_max = round(max_total / 0.95, 0) if max_total > 0 else None
+
+        bottom_axis: dict = {"position": "BOTTOM_AXIS", "title": "PKR"}
+        if viewport_max:
+            bottom_axis["viewWindowOptions"] = {
+                "viewWindowMode": "EXPLICIT",
+                "viewWindowMax":  viewport_max,
+            }
+
+        requests.append({"addChart": {"chart": {
+            "spec": {
+                "title": "Portfolio Health",
+                "basicChart": {
+                    "chartType":      "BAR",
+                    "legendPosition": "BOTTOM_LEGEND",
+                    "stackedType":    "STACKED",
+                    "axis": [
+                        bottom_axis,
+                        {"position": "LEFT_AXIS", "title": "Account"},
+                    ],
+                    "domains": [{"domain": _bf(0, 1)}],
+                    "series": [
+                        {"series": _bf(1, 2), "targetAxis": "BOTTOM_AXIS"},
+                        {
+                            "series": _bf(2, 3),
+                            "targetAxis": "BOTTOM_AXIS",
+                            "dataLabel": {
+                                "type":            "CUSTOM",
+                                "placement":       "OUTSIDE_END",
+                                "customLabelData": _bf(5, 6),
+                            },
+                        },
+                    ],
+                    "headerCount": 1,
+                },
+            },
+            "position": {"overlayPosition": {
+                "anchorCell": {
+                    "sheetId":     sheet_id,
+                    "rowIndex":    43,
+                    "columnIndex": 9,
+                },
+                "widthPixels":  680,
+                "heightPixels": 360,
+            }},
+        }}})
 
     sheets_service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id, body={"requests": requests},
