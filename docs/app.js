@@ -160,8 +160,10 @@ function yAxis(extra = {}) {
     ...extra,
   };
 }
-function legend(position = 'bottom') {
-  return { position, labels: { color: '#94A3B8', font: { size: 10 }, boxWidth: 10, padding: 12 } };
+function legend(position = 'bottom', useLines = false) {
+  const labels = { color: '#94A3B8', font: { size: 10 }, boxWidth: 10, padding: 12 };
+  if (useLines) { labels.usePointStyle = true; labels.pointStyleWidth = 18; }
+  return { position, labels };
 }
 
 // Per-dataset datalabels: show value only on the last point
@@ -194,26 +196,28 @@ function renderNW(vr) {
       labels,
       datasets: [
         {
-          label: 'Nominal NW',
+          label: 'Nominal Net Worth',
           data: nominal,
           borderColor: c('blue', '.9'),
           backgroundColor: c('blue', '.08'),
           fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 5,
+          pointStyle: 'line',
           datalabels: lastPointLabel,
         },
         {
-          label: 'Real NW (Inflation-Adj)',
+          label: 'Real Net Worth',
           data: real,
           borderColor: c('green', '.9'),
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
+          pointStyle: 'line',
           datalabels: lastPointLabel,
         },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend() },
+      plugins: { legend: legend('bottom', true) },
       scales: { x: xAxis(), y: yAxis() },
     },
   });
@@ -234,14 +238,14 @@ function renderCashFlow(vr) {
     data: {
       labels,
       datasets: [
-        { label: 'Income',   data: income,   borderColor: c('green', '.9'),  backgroundColor: 'transparent', tension: .35, pointRadius: 2 },
-        { label: 'Expenses', data: expenses, borderColor: c('red', '.9'),    backgroundColor: 'transparent', tension: .35, pointRadius: 2 },
-        { label: 'Net Savings', data: savings, borderColor: c('blue', '.9'), backgroundColor: c('blue', '.07'), fill: true, tension: .35, pointRadius: 2 },
+        { label: 'Income',   data: income,   borderColor: c('green', '.9'),  backgroundColor: 'transparent', tension: .35, pointRadius: 2, pointStyle: 'line' },
+        { label: 'Expenses', data: expenses, borderColor: c('red', '.9'),    backgroundColor: 'transparent', tension: .35, pointRadius: 2, pointStyle: 'line' },
+        { label: 'Net Savings', data: savings, borderColor: c('blue', '.9'), backgroundColor: c('blue', '.07'), fill: true, tension: .35, pointRadius: 2, pointStyle: 'line' },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend() },
+      plugins: { legend: legend('bottom', true) },
       scales: { x: xAxis(), y: yAxis() },
     },
   });
@@ -334,6 +338,7 @@ function renderGrowth(vr) {
           borderColor: c('blue', '.9'),
           backgroundColor: c('blue', '.10'),
           fill: true, tension: .35, pointRadius: 2,
+          pointStyle: 'line',
         },
         {
           label: 'Savings Invested (Real)',
@@ -341,13 +346,14 @@ function renderGrowth(vr) {
           borderColor: c('yellow', '.8'),
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2,
+          pointStyle: 'line',
         },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: legend(),
+        legend: legend('bottom', true),
         tooltip: {
           callbacks: {
             afterBody: (items) => {
@@ -386,7 +392,7 @@ function renderContribution(vr) {
   const greenData = nomReturn.map((r) => Math.max(r, 0));
   const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
 
-  const xMax = Math.max(...currentBal, ...nominal, ...inflFloor) * 1.18;
+  const xMax = Math.max(...currentBal, ...nominal, ...inflFloor) / 0.95;
 
   const annotations = Object.fromEntries(
     inflFloor.map((floor, i) => [
@@ -416,7 +422,7 @@ function renderContribution(vr) {
 
   const sgn    = (v) => (v >= 0 ? '+' : '−') + fmtPKR(Math.abs(v));
   const fmtPct = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
-  const makeLabel = (i) => [`${sgn(nomReturn[i])} nom`, `${fmtPct(realPct[i])} real`];
+  const makeLabel = (i) => [fmtPKR(currentBal[i]), `${fmtPct(realPct[i])} real`];
 
   const labelCfg = {
     anchor: 'end', align: 'right', padding: { left: 6 },
