@@ -207,7 +207,7 @@ function renderNW(vr) {
         {
           label: 'Real Net Worth',
           data: real,
-          borderColor: c('green', '.9'),
+          borderColor: 'rgba(160,160,170,.85)',
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
           pointStyle: 'line',
@@ -257,7 +257,7 @@ function renderAllocation(vr) {
   if (!rows.length) return;
 
   const labels = rows.map((r) => fmtMonth(r[0]));
-  const cats   = ['Cash/PKR', 'Investments', 'Fgn Currency', 'Gold', 'Receivables'];
+  const cats   = ['Cash/PKR', 'Investments', 'Foreign Currency', 'Gold', 'Receivables'];
   const colors = ['blue', 'purple', 'green', 'yellow', 'orange'];
 
   const datasets = cats.map((cat, i) => ({
@@ -392,7 +392,7 @@ function renderContribution(vr) {
   const greenData = nomReturn.map((r) => Math.max(r, 0));
   const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
 
-  const xMax = Math.max(...currentBal, ...nominal, ...inflFloor) / 0.95;
+  const xMax = Math.ceil(Math.max(...currentBal, ...nominal, ...inflFloor) / 50000) * 50000;
 
   const annotations = Object.fromEntries(
     inflFloor.map((floor, i) => [
