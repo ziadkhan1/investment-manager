@@ -642,8 +642,8 @@ def compute_dashboard_data(
         floor = float(latest_acct.at[name, "Balance (PKR - Inflation Floor)"])
         bank_rows.append({
             "Account":                name,
-            "Nominal Deposits (PKR)": round(floor, 0),        # inflation floor = break-even baseline
-            "Nominal Return (PKR)":   round(bal - floor, 0),  # + beat inflation, − fell behind
+            "Nominal Deposits (PKR)": round(bal, 0),
+            "Nominal Return (PKR)":   0.0,
             "Inflation Floor (PKR)":  round(floor, 0),
             "Kind":                   "bank",
         })

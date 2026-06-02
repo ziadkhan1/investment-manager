@@ -435,7 +435,11 @@ function renderContribution(vr) {
           data:  blueData,
           backgroundColor: c('blue', '.65'),
           stack: 'rc',
-          datalabels: { display: false },
+          datalabels: {
+            ...labelCfg,
+            display:   (ctx) => kind[ctx.dataIndex] === 'bank',
+            formatter: (_, ctx) => fmtPKR(currentBal[ctx.dataIndex]),
+          },
         },
         {
           label: 'Profit',
@@ -512,8 +516,15 @@ async function fetchAndRender() {
 
     const cagrNom  = parseFloat(vrScalars?.values?.[1]?.[1]) || 0;
     const cagrReal = parseFloat(vrScalars?.values?.[2]?.[1]) || 0;
+
+    const bRows    = parseBlock(vrB, true).rows;
+    const avgSavingsRate = bRows.length
+      ? Math.round(bRows.reduce((s, r) => s + (parseFloat(r[4]) || 0), 0) / bRows.length)
+      : 0;
+
     const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
-    $('nw-usd').textContent = `Wealth CAGR ${sgn(cagrNom)}% p.a.  ·  Real ${sgn(cagrReal)}%`;
+    $('nw-usd').textContent =
+      `Savings Rate ${avgSavingsRate}%  ·  CAGR ${sgn(cagrNom)}%  ·  Real CAGR ${sgn(cagrReal)}%`;
 
     // Count only valid YYYY-MM rows (skip header + gap rows + block_f account rows
     // that all land in the same unbounded A:C range we fetched above)
