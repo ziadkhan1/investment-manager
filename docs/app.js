@@ -213,6 +213,15 @@ function renderNW(vr) {
   forecast.push(latest);
   for (let k = 1; k <= FCAST; k++) forecast.push(Math.round(latest + slope * k));
 
+  // Year-end KPI: project the same monthly slope out to December of this year.
+  const monthsToYE  = Math.max(0, 12 - Number(lastMonth.split('-')[1]));
+  const yearEndNW   = Math.round(latest + slope * monthsToYE);
+  const yeEl = $('metric-yearend');
+  if (yeEl) {
+    yeEl.textContent = fmtPKR(yearEndNW);
+    yeEl.title = `Forecast for Dec ${lastMonth.split('-')[0]} at the recent ${win}-month trend`;
+  }
+
   // Pad actual series so they align with the extended label axis.
   const pad = new Array(FCAST).fill(null);
 
