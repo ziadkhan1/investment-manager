@@ -24,7 +24,7 @@ the "Done" section with its commit hash.
 3. **Year-End KPI — rename label**
    - Files: [docs/index.html](docs/index.html) (`#metric-yearend` label),
      [docs/app.js](docs/app.js) (`renderNW`, tooltip text)
-   - Rename "Year-End" → **"Projected Year-End"** (suggested — see note below).
+   - Rename "Year-End" → **"EOY Forecast"** (confirmed by user).
 
 4. **Year-End KPI — no rounding / full number**
    - File: [docs/app.js](docs/app.js) → `renderNW`
@@ -38,9 +38,8 @@ the "Done" section with its commit hash.
 
 > When applying: bump the service-worker cache (`docs/sw.js` `CACHE = 'finance-vN'`).
 
-### Note — suggested label name (item 3)
-Primary suggestion: **"Projected Year-End"**.
-Alternatives: "EOY Forecast", "Year-End Target", "Dec Forecast", "Year-End Est."
+### Note — label name (item 3)
+Confirmed: **"EOY Forecast"**.
 
 ## Done
 _(empty)_
