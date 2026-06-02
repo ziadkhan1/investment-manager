@@ -138,6 +138,8 @@ const COLORS = {
   yellow: 'rgba(245,158,11,',
   purple: 'rgba(139,92,246,',
   orange: 'rgba(249,115,22,',
+  teal:   'rgba(45,212,191,',
+  slate:  'rgba(100,116,139,',
 };
 
 const c = (name, alpha) => COLORS[name] + alpha + ')';
@@ -308,14 +310,14 @@ function renderAllocation(vr) {
 
   const labels = rows.map((r) => fmtMonth(r[0]));
   const cats   = ['Cash/PKR', 'Investments', 'Foreign Currency', 'Gold', 'Receivables'];
-  const colors = ['blue', 'purple', 'green', 'yellow', 'orange'];
+  const colors = ['blue', 'purple', 'teal', 'yellow', 'slate'];
 
   const datasets = cats.map((cat, i) => ({
     label: cat,
     data: rows.map((r) => parseFloat(r[i + 1]) || 0),
-    backgroundColor: c(colors[i], '.45'),
-    borderColor: c(colors[i], '.95'),
-    borderWidth: 1.5,
+    backgroundColor: c(colors[i], '.5'),
+    borderColor: c(colors[i], '.85'),
+    borderWidth: 1,
     fill: true,
     tension: .3,
     pointRadius: 0,
@@ -337,7 +339,7 @@ function renderAllocation(vr) {
   });
 }
 
-// ── Chart 4: Currency Exposure (stacked bars: Hard vs PKR) ───────────────────
+// ── Chart 4: Currency Exposure (stacked area: Hard vs PKR) ───────────────────
 function renderExposure(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
@@ -346,17 +348,29 @@ function renderExposure(vr) {
   const hard   = rows.map((r) => parseFloat(r[1]) || 0);
   const pkrA   = rows.map((r) => parseFloat(r[2]) || 0);
 
+  const area = (label, data, color) => ({
+    label, data,
+    backgroundColor: c(color, '.5'),
+    borderColor: c(color, '.85'),
+    borderWidth: 1,
+    fill: true,
+    tension: .3,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+  });
+
   mkChart('chart-exposure', {
-    type: 'bar',
+    type: 'line',
     data: {
       labels,
       datasets: [
-        { label: 'Hard Currency (GBP/USD/Gold)', data: hard, backgroundColor: c('purple', '.82'), stack: 'exp' },
-        { label: 'PKR Assets',                   data: pkrA, backgroundColor: c('blue', '.6'),    stack: 'exp' },
+        area('PKR Assets',                   pkrA, 'blue'),
+        area('Hard Currency (GBP/USD/Gold)', hard, 'purple'),
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
       plugins: { legend: legend() },
       scales: {
         x: { ...xAxis(), stacked: true },
