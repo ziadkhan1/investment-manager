@@ -321,12 +321,6 @@ function renderGrowth(vr) {
   const nw      = rows.map((r) => parseFloat(r[1]) || 0);
   const savings = rows.map((r) => parseFloat(r[2]) || 0);
 
-  // Show investment returns contribution in header badge
-  const latestNW  = nw[nw.length - 1] || 0;
-  const latestSav = savings[savings.length - 1] || 0;
-  const retPct    = latestSav > 0 ? (((latestNW - latestSav) / latestSav) * 100).toFixed(0) : 0;
-  $('nw-usd').textContent = `Returns: +${retPct}% on invested`;
-
   mkChart('chart-growth', {
     type: 'line',
     data: {
@@ -504,16 +498,22 @@ async function fetchAndRender() {
   try {
     const R = CFG.DATA_ROW;
 
-    // Fetch all 5 time-series blocks in one call
+    // Fetch all 5 time-series blocks + scalar metrics in one call
     const batch1 = await batchGet([
-      `Dashboard!A${R}:C`,   // Block A: NW timeline
-      `Dashboard!E${R}:I`,   // Block B: Cash flow
-      `Dashboard!K${R}:P`,   // Block C: Asset allocation
-      `Dashboard!R${R}:T`,   // Block D: Currency exposure
-      `Dashboard!V${R}:X`,   // Block E: Growth attribution
+      `Dashboard!A${R}:C`,       // Block A: NW timeline
+      `Dashboard!E${R}:I`,       // Block B: Cash flow
+      `Dashboard!K${R}:P`,       // Block C: Asset allocation
+      `Dashboard!R${R}:T`,       // Block D: Currency exposure
+      `Dashboard!V${R}:X`,       // Block E: Growth attribution
+      `Dashboard!Y${R}:Z${R+2}`, // Scalars: Wealth CAGR nom + real
     ]);
 
-    const [vrA, vrB, vrC, vrD, vrE] = batch1.valueRanges;
+    const [vrA, vrB, vrC, vrD, vrE, vrScalars] = batch1.valueRanges;
+
+    const cagrNom  = parseFloat(vrScalars?.values?.[1]?.[1]) || 0;
+    const cagrReal = parseFloat(vrScalars?.values?.[2]?.[1]) || 0;
+    const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
+    $('nw-usd').textContent = `Wealth CAGR ${sgn(cagrNom)}% p.a.  ·  Real ${sgn(cagrReal)}%`;
 
     // Count only valid YYYY-MM rows (skip header + gap rows + block_f account rows
     // that all land in the same unbounded A:C range we fetched above)

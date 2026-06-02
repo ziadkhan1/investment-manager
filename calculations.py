@@ -665,6 +665,16 @@ def compute_dashboard_data(
         "Inflation Floor (PKR)", "Total (PKR)", "Total Label", "Kind",
     ]]
 
+    # ── Wealth CAGR (nominal + real) ──────────────────────────────────────────
+    _nw_series = summary["Net Worth (PKR)"].astype(float)
+    _nw_first  = float(_nw_series.iloc[0]) or 1
+    _nw_last   = float(_nw_series.iloc[-1])
+    _years     = len(months_list) / 12
+    _cagr_nom  = round(((_nw_last / _nw_first) ** (1 / _years) - 1) * 100, 1) if _years > 0 else 0.0
+    _cpi_cagr  = ((cpi_series.get(months_list[-1], 100) / cpi_series.get(months_list[0], 100))
+                  ** (1 / _years) - 1) if _years > 0 else 0.0
+    _cagr_real = round(((1 + _cagr_nom / 100) / (1 + _cpi_cagr) - 1) * 100, 1)
+
     return {
         "block_a": block_a,
         "block_b": block_b,
@@ -672,4 +682,6 @@ def compute_dashboard_data(
         "block_d": block_d,
         "block_e": block_e,
         "block_f": block_f,
+        "wealth_cagr_nom":  _cagr_nom,
+        "wealth_cagr_real": _cagr_real,
     }

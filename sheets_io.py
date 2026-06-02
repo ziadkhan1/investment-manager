@@ -637,6 +637,7 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     CC = 10  # block_c: cols 10-15 (Month + 5 categories)
     CD = 17  # block_d: cols 17-19 (Month, Hard, PKR)
     CE = 21  # block_e: cols 21-23 (Month, Net Worth, Savings)
+    CY = 24  # scalars:  cols 24-25 (Y, Z) — Wealth CAGR nom + real
 
     def _write_block(df, row0, col0):
         rows = [list(df.columns)] + [
@@ -657,6 +658,12 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     _write_block(block_e, DATA_START, CE)
     if len(block_f) > 0:
         _write_block(block_f, BLOCK2_ROW, 0)
+
+    scalars_df = pd.DataFrame([
+        ["Wealth CAGR Nom%",  dashboard_data["wealth_cagr_nom"]],
+        ["Wealth CAGR Real%", dashboard_data["wealth_cagr_real"]],
+    ], columns=["Metric", "Value"])
+    _write_block(scalars_df, DATA_START, CY)
 
     # ── Source range builders ─────────────────────────────────────────────────
     def _ts(col_s, col_e):
