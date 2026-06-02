@@ -102,19 +102,21 @@ def compute_monthly_balances(tx, accounts, prices: dict, hist_rates: dict) -> pd
                 ),
                 errors="coerce",
             ).fillna(cpi_T)
-            bal_real = round((acct_tx["amount_pkr"] * tx_cpi / cpi_T).sum(), 2)
+            bal_real       = round((acct_tx["amount_pkr"] * tx_cpi / cpi_T).sum(), 2)
+            bal_infl_floor = round((acct_tx["amount_pkr"] * cpi_T / tx_cpi).sum(), 2)
 
             rows.append({
-                "Month":                month_str,
-                "Account":              acct["accountName"],
-                "Group":                acct["accountGroupName"] or "",
-                "Type":                 acct["accountTypeName"]  or "",
-                "Currency":             currency,
-                "Balance (PKR)":        round(bal_pkr, 2),
-                "Balance (PKR - Real)": bal_real,
-                "Balance (Native)":     bal_native,
-                "Balance (USD)":        bal_usd,
-                "Balance (Gold g)":     bal_gold,
+                "Month":                          month_str,
+                "Account":                        acct["accountName"],
+                "Group":                          acct["accountGroupName"] or "",
+                "Type":                           acct["accountTypeName"]  or "",
+                "Currency":                       currency,
+                "Balance (PKR)":                  round(bal_pkr, 2),
+                "Balance (PKR - Real)":           bal_real,
+                "Balance (PKR - Inflation Floor)": bal_infl_floor,
+                "Balance (Native)":               bal_native,
+                "Balance (USD)":                  bal_usd,
+                "Balance (Gold g)":               bal_gold,
             })
 
     return pd.DataFrame(rows)
@@ -131,11 +133,13 @@ def compute_summary(df: pd.DataFrame) -> pd.DataFrame:
     nw_usd  = df.groupby("Month")["Balance (USD)"].sum()
     nw_gold = df.groupby("Month")["Balance (Gold g)"].sum()
     nw_real = df.groupby("Month")["Balance (PKR - Real)"].sum()
+    nw_infl = df.groupby("Month")["Balance (PKR - Inflation Floor)"].sum()
 
     pkr_vals  = [nw_pkr.get(m, 0)  for m in months]
     usd_vals  = [nw_usd.get(m, 0)  for m in months]
     gold_vals = [nw_gold.get(m, 0) for m in months]
     real_vals = [nw_real.get(m, 0) for m in months]
+    infl_vals = [nw_infl.get(m, 0) for m in months]
 
     base_pkr  = pkr_vals[0]  or 1
     base_usd  = usd_vals[0]  or 1
@@ -143,15 +147,16 @@ def compute_summary(df: pd.DataFrame) -> pd.DataFrame:
     base_real = real_vals[0] or 1
 
     return pd.DataFrame({
-        "Month":                months,
-        "Net Worth (PKR)":      [round(v, 2) for v in pkr_vals],
-        "Net Worth (USD)":      [round(v, 2) for v in usd_vals],
-        "Net Worth (Gold g)":   [round(v, 4) for v in gold_vals],
-        "Real Net Worth (PKR)": [round(v, 2) for v in real_vals],
-        "PKR Index":            [round(v / base_pkr  * 100, 2) for v in pkr_vals],
-        "USD Index":            [round(v / base_usd  * 100, 2) for v in usd_vals],
-        "Gold Index":           [round(v / base_gold * 100, 2) for v in gold_vals],
-        "Real PKR Index":       [round(v / base_real * 100, 2) for v in real_vals],
+        "Month":                  months,
+        "Net Worth (PKR)":        [round(v, 2) for v in pkr_vals],
+        "Net Worth (USD)":        [round(v, 2) for v in usd_vals],
+        "Net Worth (Gold g)":     [round(v, 4) for v in gold_vals],
+        "Real Net Worth (PKR)":   [round(v, 2) for v in real_vals],
+        "Inflation Floor (PKR)":  [round(v, 2) for v in infl_vals],
+        "PKR Index":              [round(v / base_pkr  * 100, 2) for v in pkr_vals],
+        "USD Index":              [round(v / base_usd  * 100, 2) for v in usd_vals],
+        "Gold Index":             [round(v / base_gold * 100, 2) for v in gold_vals],
+        "Real PKR Index":         [round(v / base_real * 100, 2) for v in real_vals],
     })
 
 
@@ -498,8 +503,8 @@ def compute_dashboard_data(
     )
 
     # ── Block A: Real vs Nominal Net Worth ────────────────────────────────────
-    block_a = summary[["Month", "Net Worth (PKR)", "Real Net Worth (PKR)"]].copy()
-    block_a.columns = ["Month", "Nominal Net Worth (PKR)", "Real Net Worth (PKR)"]
+    block_a = summary[["Month", "Net Worth (PKR)", "Inflation Floor (PKR)"]].copy()
+    block_a.columns = ["Month", "Nominal Net Worth (PKR)", "Inflation Floor (PKR)"]
 
     # ── Block B: Monthly Income, Expenses, Savings Rate ───────────────────────
     income_m  = (

@@ -205,7 +205,7 @@ function renderNW(vr) {
           datalabels: lastPointLabel,
         },
         {
-          label: 'Real Net Worth',
+          label: 'Inflation Floor',
           data: real,
           borderColor: 'rgba(160,160,170,.85)',
           backgroundColor: 'transparent',
