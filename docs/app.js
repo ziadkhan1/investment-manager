@@ -381,6 +381,7 @@ function renderContribution(vr) {
   const nominal   = rows.map((r) => parseFloat(r[1]) || 0);  // actual PKR deposited
   const nomReturn = rows.map((r) => parseFloat(r[2]) || 0);  // current value − nominal (signed)
   const inflFloor = rows.map((r) => parseFloat(r[3]) || 0);  // CPI-adjusted deposit value today
+  const kind      = rows.map((r) => r[6] || 'invest');       // 'invest' | 'bank'
 
   const currentBal = nominal.map((n, i) => n + nomReturn[i]);
   const realGain   = currentBal.map((b, i) => b - inflFloor[i]);
@@ -440,7 +441,13 @@ function renderContribution(vr) {
           data:  blueData,
           backgroundColor: c('blue', '.65'),
           stack: 'rc',
-          datalabels: { display: false },
+          // Bank/cash bars carry no profit/loss segment, so label the nominal
+          // amount on the blue bar itself; investment bars stay unlabelled here.
+          datalabels: {
+            ...labelCfg,
+            display:   (ctx) => kind[ctx.dataIndex] === 'bank',
+            formatter: (_, ctx) => fmtPKR(currentBal[ctx.dataIndex]),
+          },
         },
         {
           label: 'Profit',
@@ -522,7 +529,7 @@ async function fetchAndRender() {
     );
     const blockFRow = R + nMonths + 3;
 
-    const batch2 = await batchGet([`Dashboard!A${blockFRow}:D`]);
+    const batch2 = await batchGet([`Dashboard!A${blockFRow}:G`]);
     const vrF    = batch2.valueRanges[0];
 
     renderNW(vrA);

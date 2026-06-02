@@ -621,8 +621,35 @@ def compute_dashboard_data(
         contrib_df.assign(_rpct=(_curr - _infl) / _infl)
         .sort_values("_rpct", ascending=False)
         .drop(columns=["_rpct"])
+        .reset_index(drop=True)
     )
-    block_f = contrib_df.reset_index(drop=True)
+    contrib_df["Kind"] = "invest"
+
+    # Bank / cash (PKR) accounts: show nominal balance + inflation floor only, no
+    # profit/loss. Inflation floor = current-month inflation-grossed-up value of
+    # all flows (Balance (PKR - Inflation Floor)) — the same figure plotted on the
+    # Net Worth chart, but per account.
+    latest_acct = monthly_df[monthly_df["Month"] == latest_month].set_index("Account")
+    bank_rows = []
+    for name, cat in name_to_cat.items():
+        if cat != "Cash/PKR" or name not in latest_acct.index:
+            continue
+        bal = float(latest_acct.at[name, "Balance (PKR)"])
+        if abs(bal) <= 100:
+            continue
+        floor = float(latest_acct.at[name, "Balance (PKR - Inflation Floor)"])
+        bank_rows.append({
+            "Account":                name,
+            "Nominal Deposits (PKR)": round(bal, 0),
+            "Nominal Return (PKR)":   0.0,
+            "Inflation Floor (PKR)":  round(floor, 0),
+            "Kind":                   "bank",
+        })
+    bank_df = pd.DataFrame(bank_rows)
+    if not bank_df.empty:
+        bank_df = bank_df.sort_values("Nominal Deposits (PKR)", ascending=False)
+
+    block_f = pd.concat([contrib_df, bank_df], ignore_index=True)
     _total = block_f["Nominal Deposits (PKR)"] + block_f["Nominal Return (PKR)"]
     block_f["Total (PKR)"] = _total.round(0)
     block_f["Total Label"] = _total.apply(
@@ -630,6 +657,11 @@ def compute_dashboard_data(
                    else f"{v / 1_000:.0f}K" if abs(v) >= 1_000
                    else str(int(round(v))))
     )
+    # Keep Kind last so Total / Total Label stay at their fixed sheet columns.
+    block_f = block_f[[
+        "Account", "Nominal Deposits (PKR)", "Nominal Return (PKR)",
+        "Inflation Floor (PKR)", "Total (PKR)", "Total Label", "Kind",
+    ]]
 
     return {
         "block_a": block_a,
