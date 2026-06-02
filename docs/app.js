@@ -441,13 +441,7 @@ function renderContribution(vr) {
           data:  blueData,
           backgroundColor: c('blue', '.65'),
           stack: 'rc',
-          // Bank/cash bars carry no profit/loss segment, so label the nominal
-          // amount on the blue bar itself; investment bars stay unlabelled here.
-          datalabels: {
-            ...labelCfg,
-            display:   (ctx) => kind[ctx.dataIndex] === 'bank',
-            formatter: (_, ctx) => fmtPKR(currentBal[ctx.dataIndex]),
-          },
+          datalabels: { display: false },
         },
         {
           label: 'Profit',

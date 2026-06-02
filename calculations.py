@@ -625,14 +625,16 @@ def compute_dashboard_data(
     )
     contrib_df["Kind"] = "invest"
 
-    # Bank / cash (PKR) accounts: show nominal balance + inflation floor only, no
-    # profit/loss. Inflation floor = current-month inflation-grossed-up value of
-    # all flows (Balance (PKR - Inflation Floor)) — the same figure plotted on the
-    # Net Worth chart, but per account.
+    # Bank / cash (PKR) accounts: treat the inflation floor as the "deposits"
+    # baseline so the profit/loss segment shows real purchasing-power gain or loss
+    # vs inflation, exactly like investment accounts.
+    _BANK_EXCLUDE = {"Wallet", "Easy Paisa"}
     latest_acct = monthly_df[monthly_df["Month"] == latest_month].set_index("Account")
     bank_rows = []
     for name, cat in name_to_cat.items():
         if cat != "Cash/PKR" or name not in latest_acct.index:
+            continue
+        if name in _BANK_EXCLUDE:
             continue
         bal = float(latest_acct.at[name, "Balance (PKR)"])
         if abs(bal) <= 100:
@@ -640,8 +642,8 @@ def compute_dashboard_data(
         floor = float(latest_acct.at[name, "Balance (PKR - Inflation Floor)"])
         bank_rows.append({
             "Account":                name,
-            "Nominal Deposits (PKR)": round(bal, 0),
-            "Nominal Return (PKR)":   0.0,
+            "Nominal Deposits (PKR)": round(floor, 0),        # inflation floor = break-even baseline
+            "Nominal Return (PKR)":   round(bal - floor, 0),  # + beat inflation, − fell behind
             "Inflation Floor (PKR)":  round(floor, 0),
             "Kind":                   "bank",
         })
