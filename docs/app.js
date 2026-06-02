@@ -89,6 +89,7 @@ async function batchGet(ranges) {
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',   // never serve a stale Sheets response (would show last month's NW)
   });
 
   if (res.status === 401) {
