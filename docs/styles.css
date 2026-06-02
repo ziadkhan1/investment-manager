@@ -14,7 +14,7 @@
   --text:        #F1F5F9;
   --subtext:     #94A3B8;
   --muted:       #475569;
-  --header-h:    84px;
+  --header-h:    80px;
 }
 
 html, body {
@@ -140,40 +140,41 @@ header {
 
 .nw-metrics {
   display: flex;
-  gap: .35rem;
+  align-items: center;
+  gap: .6rem;
   margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.07);
 }
 
 .nw-metric {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 8px;
-  padding: .22rem .55rem;
+  align-items: baseline;
+  gap: .28rem;
+}
+
+.nw-metric + .nw-metric::before {
+  content: '·';
+  color: var(--muted);
+  font-size: .6rem;
+  margin-right: -.1rem;
 }
 
 .metric-label {
-  font-size: .5rem;
+  font-size: .58rem;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: .07em;
+  letter-spacing: .06em;
   font-weight: 600;
   white-space: nowrap;
-  line-height: 1.2;
 }
 
 .metric-value {
-  font-size: .82rem;
+  font-size: .8rem;
   font-weight: 700;
+  color: var(--subtext);
   letter-spacing: -.01em;
-  line-height: 1.2;
 }
-
-.metric-green  { color: var(--green);  text-shadow: 0 0 10px rgba(16,185,129,.35); }
-.metric-blue   { color: #60a5fa;       text-shadow: 0 0 10px rgba(96,165,250,.35); }
-.metric-purple { color: var(--purple); text-shadow: 0 0 10px rgba(139,92,246,.35); }
 
 .header-actions {
   display: flex;
