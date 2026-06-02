@@ -5,17 +5,28 @@ from datetime import date
 
 def fetch_live_prices() -> dict:
     prices  = {}
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+        )
+    }
 
+    # goldpricez.com renders the live 24k PKR/gram into a #gold_price span and a
+    # price_24K_Ounce cell (value is per-gram on the /gram page despite the id).
+    # A JS price object (gold = USD/oz, global_usd_rate, global_unit_conv = g/oz)
+    # is the formula fallback if the markup changes again.
     gold_patterns = [
-        r'([\d,]+\.?\d*)\s*PKR\s*per\s*gram',
-        r'per gram[^<]*?(\d[\d,]*\.?\d*)',
-        r'"price":\s*([\d.]+)',
+        r'id=["\']gold_price["\'][^>]*>\s*=?\s*([\d,]+\.?\d*)',
+        r'id=["\']price_24K_Ounce["\'][^>]*>\s*([\d,]+\.?\d*)',
     ]
     rate_patterns = [
         r'1\s*(?:USD|GBP|US Dollar|British Pound)[^<\d]*([\d,]+\.?\d+)\s*PKR',
         r'([\d,]+\.?\d+)\s*PKR',
     ]
+
+    def _plausible_gold(v):
+        return 10_000 < v < 1_000_000
 
     try:
         r = requests.get("https://goldpricez.com/pk/gram", headers=headers, timeout=10)
@@ -23,9 +34,20 @@ def fetch_live_prices() -> dict:
             m = re.search(pat, r.text)
             if m:
                 val = float(m.group(1).replace(",", ""))
-                if val > 10_000:
+                if _plausible_gold(val):
                     prices["gold"] = val
                     break
+        # Formula fallback: spot USD/oz × USD-PKR × (troy-oz → gram conversion)
+        if "gold" not in prices:
+            g = re.search(r'gold\s*:\s*([\d.]+)', r.text)
+            u = re.search(r'global_usd_rate\s*=\s*([\d.]+)', r.text)
+            c = re.search(r'global_unit_conv\s*=\s*([\d.]+)', r.text)
+            if g and u and c:
+                val = float(g.group(1)) * float(u.group(1)) * float(c.group(1))
+                if _plausible_gold(val):
+                    prices["gold"] = round(val, 2)
+        if "gold" not in prices:
+            print("  Warning: gold price markup not matched — using fallback")
     except Exception as e:
         print(f"  Warning: could not fetch gold price ({e})")
 
