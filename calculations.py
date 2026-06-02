@@ -493,14 +493,9 @@ def compute_dashboard_data(
     ) | {GOLD_ACCOUNT_ID}
     non_invest_ids = set(accounts["accountsTableID"].tolist()) - invest_ids
 
-    # Pre-compute per-transaction month label and CPI adjustment once
+    # Pre-compute per-transaction month label once
     tx_w = tx.copy()
-    tx_w["month_str"]    = tx_w["period"].apply(lambda p: p.strftime("%Y-%m"))
-    tx_w["cpi_adj_amt"]  = (
-        tx_w["period"].apply(lambda p: cpi_series.get(p.strftime("%Y-%m"), cpi_today))
-        / cpi_today
-        * tx_w["amount_pkr"]
-    )
+    tx_w["month_str"] = tx_w["period"].apply(lambda p: p.strftime("%Y-%m"))
 
     # ── Block A: Real vs Nominal Net Worth ────────────────────────────────────
     block_a = summary[["Month", "Net Worth (PKR)", "Inflation Floor (PKR)"]].copy()
@@ -574,25 +569,37 @@ def compute_dashboard_data(
         })
     block_d = pd.DataFrame(exp_rows)
 
-    # ── Block E: Growth Attribution (cumulative, CPI-real) ────────────────────
+    # ── Block E: Net Worth vs Savings Invested ────────────────────────────────
+    # Savings baseline = opening balances + cumulative (income − expenses), all
+    # NOMINAL, compared against nominal net worth. The gap is then the true
+    # return your assets earned (fund gains, FX, gold, interest) rather than an
+    # artifact of inflation framing. Income paid INTO investment accounts is
+    # excluded (that is return, not new money); opening balances ARE contributed
+    # capital, so they belong in the baseline.
+    open_cum = (
+        tx_w[tx_w["transactionTypeID"] == 2]
+        .groupby("month_str")["amount_pkr"].sum()
+    )
     inc_cum = (
         tx_w[(tx_w["transactionTypeID"] == 4) & tx_w["accountID"].isin(non_invest_ids)]
-        .groupby("month_str")["cpi_adj_amt"].sum()
+        .groupby("month_str")["amount_pkr"].sum()
     )
     exp_cum = (
         tx_w[tx_w["transactionTypeID"] == 3]
-        .groupby("month_str")["cpi_adj_amt"].sum()
+        .groupby("month_str")["amount_pkr"].sum()
     )
 
     attr_rows    = []
     cum_savings  = 0.0
     for month in months_list:
-        cum_savings += inc_cum.get(month, 0.0) + exp_cum.get(month, 0.0)
-        actual_nw   = monthly_df[monthly_df["Month"] == month]["Balance (PKR)"].sum()
+        cum_savings += (
+            open_cum.get(month, 0.0) + inc_cum.get(month, 0.0) + exp_cum.get(month, 0.0)
+        )
+        actual_nw = monthly_df[monthly_df["Month"] == month]["Balance (PKR)"].sum()
         attr_rows.append({
-            "Month":                   month,
-            "Net Worth (PKR)":         round(actual_nw, 0),
-            "Cumulative Savings (PKR)": round(max(cum_savings, 0), 0),
+            "Month":                  month,
+            "Net Worth (PKR)":        round(actual_nw, 0),
+            "Savings Invested (PKR)": round(max(cum_savings, 0), 0),
         })
     block_e = pd.DataFrame(attr_rows)
 

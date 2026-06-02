@@ -172,7 +172,20 @@ function yAxis(extra = {}) {
 }
 function legend(position = 'bottom', useLines = false) {
   const labels = { color: '#94A3B8', font: { size: 10 }, boxWidth: 10, padding: 12 };
-  if (useLines) { labels.usePointStyle = true; labels.pointStyleWidth = 18; }
+  if (useLines) {
+    labels.usePointStyle = true;
+    labels.pointStyleWidth = 18;
+    // Mirror each dataset's dash pattern onto its legend marker so dashed lines
+    // (Forecast, Inflation Floor, Savings Invested) read as dashed in the legend.
+    labels.generateLabels = (chart) => {
+      const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+      items.forEach((it) => {
+        const ds = chart.data.datasets[it.datasetIndex];
+        if (ds && ds.borderDash && ds.borderDash.length) it.lineDash = ds.borderDash;
+      });
+      return items;
+    };
+  }
   return { position, labels };
 }
 
@@ -218,7 +231,7 @@ function renderNW(vr) {
   const yearEndNW   = Math.round(latest + slope * monthsToYE);
   const yeEl = $('metric-yearend');
   if (yeEl) {
-    yeEl.textContent = fmtPKR(yearEndNW);
+    yeEl.textContent = fmtN(yearEndNW);
     yeEl.title = `Forecast for Dec ${lastMonth.split('-')[0]} at the recent ${win}-month trend`;
   }
 
@@ -373,8 +386,8 @@ function renderExposure(vr) {
     data: {
       labels,
       datasets: [
-        area('PKR Assets',                   pkrA, 'blue'),
         area('Hard Currency (GBP/USD/Gold)', hard, 'purple'),
+        area('PKR Assets',                   pkrA, 'blue'),
       ],
     },
     options: {
@@ -412,7 +425,7 @@ function renderGrowth(vr) {
           pointStyle: 'line',
         },
         {
-          label: 'Savings Invested (Real)',
+          label: 'Savings Invested',
           data: savings,
           borderColor: c('yellow', '.8'),
           backgroundColor: 'transparent',

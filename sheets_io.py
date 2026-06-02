@@ -158,9 +158,9 @@ def write_monthly_sheet(sheets_service, spreadsheet_id, df: pd.DataFrame):
 
 def write_analysis_sheet(sheets_service, spreadsheet_id, summary: pd.DataFrame):
     """
-    Writes summary metrics and 2 charts:
-      Chart 1 — Net Worth in PKR (absolute)
-      Chart 2 — PKR / USD / Gold / Real indexed to 100 (trend comparison)
+    Writes summary metrics and 1 chart:
+      PKR / USD / Gold / Real indexed to 100 (trend comparison).
+    The absolute Net Worth (PKR) chart was removed — the web app renders it.
     """
     sheet_id = _get_or_add_sheet(sheets_service, spreadsheet_id, ANALYSIS_SHEET)
     num_rows = len(summary) + 1
@@ -231,15 +231,16 @@ def write_analysis_sheet(sheets_service, spreadsheet_id, summary: pd.DataFrame):
             }
         }
 
+    # The absolute Net Worth (PKR) chart is rendered by the web app, so only the
+    # indexed PKR/USD/Gold/Real trend comparison (not in the web app) is kept here.
     sheets_service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
         body={"requests": [
-            make_chart("Net Worth (PKR)", "PKR", [1], "LINE", 0),
-            make_chart("Value Trend (Indexed, Base = 100)", "Index", [5, 6, 7, 8], "LINE", 21),
+            make_chart("Value Trend (Indexed, Base = 100)", "Index", [5, 6, 7, 8], "LINE", 0),
         ]},
     ).execute()
 
-    print(f"  Analysis: {len(summary)} months of data + 2 charts.")
+    print(f"  Analysis: {len(summary)} months of data + 1 chart.")
 
 
 # ── Account Analysis ──────────────────────────────────────────────────────────
@@ -608,11 +609,10 @@ def write_transactions_sheet(sheets_service, spreadsheet_id, tx, accounts):
 
 def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     """
-    Writes a Dashboard sheet with 6 charts arranged in a 2×3 grid:
-      Row 1 — Real vs Nominal Net Worth  |  Monthly Income vs Expenses
-      Row 2 — Asset Allocation           |  Hard Currency Exposure
-      Row 3 — Growth Attribution         |  Portfolio Health
-    Data tables that back the charts are written below row 66.
+    Writes the six data blocks (A–F) plus scalar metrics that back the web-app
+    dashboard (docs/). The web app reads these ranges via the Sheets API and
+    renders the charts itself, so no embedded Google Sheets charts are created
+    here. Data tables start at row 67 (DATA_START = 66, 0-based).
     """
     sheet_id = _get_or_add_sheet(sheets_service, spreadsheet_id, DASHBOARD_SHEET)
     _clear_charts(sheets_service, spreadsheet_id, sheet_id)
@@ -665,165 +665,7 @@ def write_dashboard_sheet(sheets_service, spreadsheet_id, dashboard_data: dict):
     ], columns=["Metric", "Value"])
     _write_block(scalars_df, DATA_START, CY)
 
-    # ── Source range builders ─────────────────────────────────────────────────
-    def _ts(col_s, col_e):
-        """Time-series range: DATA_START header + n_months data rows."""
-        return {"sourceRange": {"sources": [{
-            "sheetId":          sheet_id,
-            "startRowIndex":    DATA_START,
-            "endRowIndex":      DATA_START + n_months + 1,
-            "startColumnIndex": col_s,
-            "endColumnIndex":   col_e,
-        }]}}
-
-    def _bf(col_s, col_e):
-        """Block-F range: per-account rows."""
-        return {"sourceRange": {"sources": [{
-            "sheetId":          sheet_id,
-            "startRowIndex":    BLOCK2_ROW,
-            "endRowIndex":      BLOCK2_ROW + len(block_f) + 1,
-            "startColumnIndex": col_s,
-            "endColumnIndex":   col_e,
-        }]}}
-
-    def _chart(title, chart_type, domain_src, series_srcs,
-               anchor_row, anchor_col, y_label="", x_label="Month", stacked=False,
-               series_axis="LEFT_AXIS", line_style=False, subtitle=None):
-        # Use COMBO with explicit type:LINE per series so Google Sheets renders
-        # line segments (not filled rectangles) as legend icons.
-        if line_style and chart_type == "LINE":
-            actual_type = "COMBO"
-            series_list = [
-                {"series": s, "targetAxis": series_axis,
-                 "type": "LINE", "lineStyle": {"width": 2, "type": "SOLID"}}
-                for s in series_srcs
-            ]
-        else:
-            actual_type = chart_type
-            series_list = [{"series": s, "targetAxis": series_axis} for s in series_srcs]
-        spec = {
-            "chartType":      actual_type,
-            "legendPosition": "BOTTOM_LEGEND",
-            "axis": [
-                {"position": "BOTTOM_AXIS", "title": x_label},
-                {"position": "LEFT_AXIS",   "title": y_label},
-            ],
-            "domains": [{"domain": domain_src}],
-            "series": series_list,
-            "headerCount": 1,
-        }
-        if stacked:
-            spec["stackedType"] = "STACKED"
-        chart_spec = {"title": title, "basicChart": spec}
-        if subtitle is not None:
-            chart_spec["subtitle"] = subtitle
-        return {"addChart": {"chart": {
-            "spec": chart_spec,
-            "position": {"overlayPosition": {
-                "anchorCell": {
-                    "sheetId":     sheet_id,
-                    "rowIndex":    anchor_row,
-                    "columnIndex": anchor_col,
-                },
-                "widthPixels":  680,
-                "heightPixels": 360,
-            }},
-        }}}
-
-    requests = [
-        # Row 1, left: Real vs Nominal Net Worth
-        _chart(
-            "Real vs Nominal Net Worth", "LINE",
-            _ts(CA, CA+1),
-            [_ts(CA+1, CA+2), _ts(CA+2, CA+3)],
-            anchor_row=1, anchor_col=0, y_label="PKR",
-            line_style=True, subtitle="",
-        ),
-        # Row 1, right: Monthly Income vs Expenses
-        _chart(
-            "Monthly Income vs Expenses", "LINE",
-            _ts(CB, CB+1),
-            [_ts(CB+1, CB+2), _ts(CB+2, CB+3), _ts(CB+3, CB+4)],
-            anchor_row=1, anchor_col=9, y_label="PKR",
-            line_style=True, subtitle="",
-        ),
-        # Row 2, left: Asset Allocation (stacked area)
-        _chart(
-            "Asset Allocation Over Time", "AREA",
-            _ts(CC, CC+1),
-            [_ts(CC+i, CC+i+1) for i in range(1, 6)],
-            anchor_row=22, anchor_col=0, y_label="PKR", stacked=True,
-        ),
-        # Row 2, right: Hard Currency Exposure (stacked area: Hard + PKR = total assets)
-        _chart(
-            "Currency Exposure (Hard vs PKR Assets)", "AREA",
-            _ts(CD, CD+1),
-            [_ts(CD+1, CD+2), _ts(CD+2, CD+3)],
-            anchor_row=22, anchor_col=9, y_label="PKR", stacked=True,
-        ),
-        # Row 3, left: Growth Attribution — Net Worth vs Savings baseline
-        _chart(
-            "Net Worth vs Savings Invested (Real PKR)", "LINE",
-            _ts(CE, CE+1),
-            [_ts(CE+1, CE+2), _ts(CE+2, CE+3)],
-            anchor_row=43, anchor_col=0, y_label="PKR (Real)",
-            line_style=True,
-        ),
-    ]
-
-    # Row 3, right: Portfolio Health — horizontal stacked bars with total labels
-    if len(block_f) > 0:
-        total_nums  = pd.to_numeric(block_f["Total (PKR)"], errors="coerce")
-        max_total   = float(total_nums.max()) if not total_nums.empty else 0
-        viewport_max = round(max_total / 0.95, 0) if max_total > 0 else None
-
-        bottom_axis: dict = {"position": "BOTTOM_AXIS", "title": "PKR"}
-        if viewport_max:
-            bottom_axis["viewWindowOptions"] = {
-                "viewWindowMode": "EXPLICIT",
-                "viewWindowMax":  viewport_max,
-            }
-
-        requests.append({"addChart": {"chart": {
-            "spec": {
-                "title": "Portfolio Health",
-                "basicChart": {
-                    "chartType":      "BAR",
-                    "legendPosition": "BOTTOM_LEGEND",
-                    "stackedType":    "STACKED",
-                    "axis": [
-                        bottom_axis,
-                        {"position": "LEFT_AXIS", "title": "Account"},
-                    ],
-                    "domains": [{"domain": _bf(0, 1)}],
-                    "series": [
-                        {"series": _bf(1, 2), "targetAxis": "BOTTOM_AXIS"},
-                        {
-                            "series": _bf(2, 3),
-                            "targetAxis": "BOTTOM_AXIS",
-                            "dataLabel": {
-                                "type":            "CUSTOM",
-                                "placement":       "OUTSIDE_END",
-                                "customLabelData": _bf(5, 6),
-                            },
-                        },
-                    ],
-                    "headerCount": 1,
-                },
-            },
-            "position": {"overlayPosition": {
-                "anchorCell": {
-                    "sheetId":     sheet_id,
-                    "rowIndex":    43,
-                    "columnIndex": 9,
-                },
-                "widthPixels":  680,
-                "heightPixels": 360,
-            }},
-        }}})
-
-    sheets_service.spreadsheets().batchUpdate(
-        spreadsheetId=spreadsheet_id, body={"requests": requests},
-    ).execute()
-
-    print(f"  Dashboard: {len(requests)} charts, {n_months} months of data.")
+    # These data tables are visualized by the web app (docs/), not as embedded
+    # Google Sheets charts. _clear_charts() above removes any chart objects left
+    # by older versions, so the Dashboard tab now holds data only.
+    print(f"  Dashboard: data tables written ({n_months} months); charts rendered by web app.")
