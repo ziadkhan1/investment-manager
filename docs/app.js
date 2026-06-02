@@ -41,6 +41,13 @@ function fmtMonth(s) {
   return new Date(+y, +m - 1).toLocaleDateString('en', { month: 'short', year: '2-digit' });
 }
 
+// Add k calendar months to a "YYYY-MM" string → "YYYY-MM"
+function addMonths(ym, k) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + k, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 function setLoading(on) {
   $('loading').classList.toggle('hidden', !on);
 }
@@ -167,29 +174,55 @@ function legend(position = 'bottom', useLines = false) {
   return { position, labels };
 }
 
-// Per-dataset datalabels: show value only on the last point
-const lastPointLabel = {
-  display: (ctx) => ctx.dataIndex === ctx.dataset.data.length - 1,
-  align: 'top',
-  anchor: 'end',
-  color: '#CBD5E1',
-  font: { size: 9, weight: '600' },
-  formatter: (v) => fmtPKR(v),
-  offset: 2,
-};
-
 // ── Chart 1: Real vs Nominal Net Worth ────────────────────────────────────────
 function renderNW(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
 
-  const labels  = rows.map((r) => fmtMonth(r[0]));
+  const months  = rows.map((r) => r[0]);
   const nominal = rows.map((r) => parseFloat(r[1]) || 0);
   const real    = rows.map((r) => parseFloat(r[2]) || 0);
 
-  const latest = nominal[nominal.length - 1];
+  const n      = nominal.length;
+  const latest = nominal[n - 1];
   $('nw-pkr').textContent = fmtPKRFull(latest);
-  $('last-updated').textContent = 'As of\n' + (rows[rows.length - 1]?.[0] || '');
+  $('last-updated').textContent = 'As of\n' + (rows[n - 1]?.[0] || '');
+
+  // ── 3-month linear forecast from the recent trend ────────────────────────
+  // Least-squares slope over the last `win` months projects the trajectory.
+  const FCAST = 3;
+  const win   = Math.min(6, n);
+  const seg   = nominal.slice(n - win);
+  const mx    = (win - 1) / 2;
+  const my    = seg.reduce((a, b) => a + b, 0) / win;
+  let num = 0, den = 0;
+  seg.forEach((y, i) => { num += (i - mx) * (y - my); den += (i - mx) ** 2; });
+  const slope = den ? num / den : 0;
+
+  const lastMonth = months[n - 1];
+  const labels = [
+    ...months.map(fmtMonth),
+    ...Array.from({ length: FCAST }, (_, k) => fmtMonth(addMonths(lastMonth, k + 1))),
+  ];
+
+  // Forecast series: null over history, anchored to the last actual point, then
+  // projected forward so the dashed line continues seamlessly from the curve.
+  const forecast = new Array(n - 1).fill(null);
+  forecast.push(latest);
+  for (let k = 1; k <= FCAST; k++) forecast.push(Math.round(latest + slope * k));
+
+  // Pad actual series so they align with the extended label axis.
+  const pad = new Array(FCAST).fill(null);
+
+  // Value label on the last ACTUAL month (not the padded forecast tail).
+  const lastActualLabel = {
+    display: (ctx) => ctx.dataIndex === n - 1,
+    align: 'top', anchor: 'end',
+    color: '#CBD5E1',
+    font: { size: 9, weight: '600' },
+    formatter: (v) => fmtPKR(v),
+    offset: 2,
+  };
 
   mkChart('chart-nw', {
     type: 'line',
@@ -198,21 +231,37 @@ function renderNW(vr) {
       datasets: [
         {
           label: 'Nominal Net Worth',
-          data: nominal,
+          data: [...nominal, ...pad],
           borderColor: c('blue', '.9'),
           backgroundColor: c('blue', '.08'),
           fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 5,
           pointStyle: 'line',
-          datalabels: lastPointLabel,
+          datalabels: lastActualLabel,
+        },
+        {
+          label: 'Forecast',
+          data: forecast,
+          borderColor: c('blue', '.55'),
+          backgroundColor: 'transparent',
+          borderDash: [2, 3], tension: .35, pointRadius: 0, pointHoverRadius: 4,
+          pointStyle: 'line',
+          datalabels: {
+            display: (ctx) => ctx.dataIndex === ctx.dataset.data.length - 1,
+            align: 'top', anchor: 'end',
+            color: c('blue', '.8'),
+            font: { size: 9, weight: '600' },
+            formatter: (v) => fmtPKR(v),
+            offset: 2,
+          },
         },
         {
           label: 'Inflation Floor',
-          data: real,
+          data: [...real, ...pad],
           borderColor: 'rgba(160,160,170,.85)',
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
           pointStyle: 'line',
-          datalabels: lastPointLabel,
+          datalabels: lastActualLabel,
         },
       ],
     },
@@ -252,7 +301,7 @@ function renderCashFlow(vr) {
   });
 }
 
-// ── Chart 3: Asset Allocation (stacked bars) ──────────────────────────────────
+// ── Chart 3: Asset Allocation (stacked area) ──────────────────────────────────
 function renderAllocation(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
@@ -264,17 +313,21 @@ function renderAllocation(vr) {
   const datasets = cats.map((cat, i) => ({
     label: cat,
     data: rows.map((r) => parseFloat(r[i + 1]) || 0),
-    backgroundColor: c(colors[i], '.82'),
-    borderColor: 'transparent',
-    borderRadius: i === cats.length - 1 ? { topLeft: 3, topRight: 3 } : 0,
-    stack: 'alloc',
+    backgroundColor: c(colors[i], '.45'),
+    borderColor: c(colors[i], '.95'),
+    borderWidth: 1.5,
+    fill: true,
+    tension: .3,
+    pointRadius: 0,
+    pointHoverRadius: 4,
   }));
 
   mkChart('chart-allocation', {
-    type: 'bar',
+    type: 'line',
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
       plugins: { legend: legend() },
       scales: {
         x: { ...xAxis(), stacked: true },
