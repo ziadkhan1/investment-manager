@@ -1,6 +1,6 @@
 // Minimal service worker — enables PWA installability.
 // Always uses network-first so the dashboard always shows fresh data.
-const CACHE = 'finance-v1';
+const CACHE = 'finance-v3';
 const SHELL = ['./index.html', './styles.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', (e) => {
