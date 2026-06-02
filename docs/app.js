@@ -523,8 +523,9 @@ async function fetchAndRender() {
       : 0;
 
     const sgn = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
-    $('nw-usd').textContent =
-      `Savings Rate ${avgSavingsRate}%  ·  CAGR ${sgn(cagrNom)}%  ·  Real CAGR ${sgn(cagrReal)}%`;
+    $('metric-savings').textContent = `${avgSavingsRate}%`;
+    $('metric-cagr').textContent    = `${sgn(cagrNom)}%`;
+    $('metric-real').textContent    = `${sgn(cagrReal)}%`;
 
     // Count only valid YYYY-MM rows (skip header + gap rows + block_f account rows
     // that all land in the same unbounded A:C range we fetched above)
