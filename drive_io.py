@@ -29,7 +29,8 @@ def _download_fydb(drive_service, file_id: str) -> Path:
     return Path(tmp.name)
 
 
-def download_latest_fydb(drive_service) -> Path:
+def find_latest_fydb(drive_service) -> dict | None:
+    """Newest timestamped full export from the main folder (by filename timestamp)."""
     query = "name contains 'Bluecoins' and name contains '.fydb' and trashed = false"
     if DRIVE_FOLDER_ID:
         query += f" and '{DRIVE_FOLDER_ID}' in parents"
@@ -40,10 +41,7 @@ def download_latest_fydb(drive_service) -> Path:
 
     files = results.get("files", [])
     if not files:
-        raise FileNotFoundError(
-            "No Bluecoins .fydb files found.\n"
-            f"Share the Drive folder with: {get_service_account_email()}"
-        )
+        return None
 
     files.sort(key=lambda f: parse_filename_timestamp(f["name"]), reverse=True)
 
@@ -53,23 +51,43 @@ def download_latest_fydb(drive_service) -> Path:
         ts_str = ts.strftime("%Y-%m-%d %H:%M:%S") if ts != datetime.min else "unknown"
         print(f"  {f['name']}  ({ts_str})")
 
-    latest = files[0]
+    return files[0]
+
+
+def download_latest_fydb(drive_service) -> Path:
+    latest = find_latest_fydb(drive_service)
+    if not latest:
+        raise FileNotFoundError(
+            "No Bluecoins .fydb files found.\n"
+            f"Share the Drive folder with: {get_service_account_email()}"
+        )
     print(f"Using: {latest['name']}")
     return _download_fydb(drive_service, latest["id"])
 
 
 def find_quick_sync_files(drive_service) -> list:
-    if not QUICK_SYNC_FOLDER_ID:
-        return []
-    query = (
-        "name contains '.fydb' and trashed = false "
-        f"and '{QUICK_SYNC_FOLDER_ID}' in parents"
-    )
+    """
+    Bluecoins Quick Sync overwrites a single fixed-name file `bluecoins.fydb`
+    (no timestamp in the name) which usually holds the freshest data.
+
+    Prefer the configured QUICK_SYNC_FOLDER_ID; if that secret is unset, fall back
+    to locating `bluecoins.fydb` anywhere the service account can see it, so a
+    missing folder-id never silently drops the most recent transactions.
+    Sorted newest-first by modifiedTime (filename carries no timestamp).
+    """
+    if QUICK_SYNC_FOLDER_ID:
+        query = (
+            "name contains '.fydb' and trashed = false "
+            f"and '{QUICK_SYNC_FOLDER_ID}' in parents"
+        )
+    else:
+        query = "name = 'bluecoins.fydb' and trashed = false"
+
     results = drive_service.files().list(
         q=query, fields="files(id, name, modifiedTime)", pageSize=50,
     ).execute()
     files = results.get("files", [])
-    files.sort(key=lambda f: parse_filename_timestamp(f["name"]), reverse=True)
+    files.sort(key=lambda f: f.get("modifiedTime", ""), reverse=True)
     return files
 
 

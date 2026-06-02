@@ -19,7 +19,7 @@ import os
 from datetime import date
 
 from services import get_drive_service, get_sheets_service, get_service_account_email
-from drive_io import download_latest_fydb, find_quick_sync_files, find_spreadsheet, _download_fydb
+from drive_io import find_latest_fydb, find_quick_sync_files, find_spreadsheet, _download_fydb
 from prices import fetch_live_prices, fetch_pakistan_cpi_series
 from db_queries import load_data
 from calculations import (
@@ -52,19 +52,32 @@ def main():
     sheets_service = get_sheets_service()
     spreadsheet_id = find_spreadsheet(drive_service)
 
-    db_path  = download_latest_fydb(drive_service)
-    db_paths = [db_path]
+    # Collect every candidate .fydb (newest full export + all quick-sync files),
+    # then merge them OLDEST -> NEWEST by modifiedTime. load_data dedups by
+    # transactionsTableID with keep="last", so ordering by modifiedTime guarantees
+    # the most recently saved copy of each transaction wins — regardless of which
+    # Drive folder it lives in or whether its filename carries a timestamp. This is
+    # what makes the freshest Quick Sync data (bluecoins.fydb) take precedence even
+    # when a manual export has a newer filename timestamp.
+    main_meta = find_latest_fydb(drive_service)
+    if not main_meta:
+        raise FileNotFoundError(
+            "No Bluecoins .fydb files found. Share the Drive folder with the "
+            "service account."
+        )
 
-    qs_files = find_quick_sync_files(drive_service)
-    if qs_files:
-        # Merge ALL quick sync files oldest-first so that drop_duplicates(keep="last")
-        # retains the most recent version of any transaction that appears in multiple files.
-        qs_files_asc = list(reversed(qs_files))
-        print(f"  Quick sync: {len(qs_files_asc)} file(s) found, merging all...")
-        for qs_file in qs_files_asc:
-            qs_path = _download_fydb(drive_service, qs_file["id"])
-            db_paths.append(qs_path)
-            print(f"  Merged: {qs_file['name']}")
+    candidates, seen = [], set()
+    for f in [main_meta, *find_quick_sync_files(drive_service)]:
+        if f["id"] not in seen:
+            seen.add(f["id"])
+            candidates.append(f)
+    candidates.sort(key=lambda f: f.get("modifiedTime", ""))  # oldest -> newest
+
+    print(f"  Merging {len(candidates)} file(s) oldest->newest by modifiedTime:")
+    db_paths = []
+    for f in candidates:
+        db_paths.append(_download_fydb(drive_service, f["id"]))
+        print(f"    {f['name']}  ({f.get('modifiedTime')})")
 
     try:
         print("\n[2/4] Fetching live prices...")
