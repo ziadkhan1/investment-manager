@@ -36,7 +36,29 @@ the "Done" section with its commit hash.
    - Delete `<span class="card-badge green-badge">REAL PKR</span>` from the
      "Net Worth vs Savings Invested" card header.
 
+6. **Fix "Net Worth vs Savings Invested" — savings baseline (nominal + opening)**
+   - **Why:** the current "return" gap (~32% of NW) is fake. It excludes opening
+     balances and inflation-deflates the savings line, so opening wealth (~364k)
+     and an inflation artifact (~134k) masquerade as investment return. Actual
+     return is ~3% (~51k). User confirmed framing: **nominal, include opening**.
+   - File: [calculations.py](calculations.py) → `compute_dashboard_data`, **block_e**
+     - Build cumulative savings from **nominal** flows (use `amount_pkr`, NOT
+       `cpi_adj_amt`): per month, `contributions = type-2 opening (all accounts)
+       + type-4 income (non-invest accounts) + type-3 expenses`. `cum_savings +=
+       contributions`. Keep type-4 income into investment accounts EXCLUDED
+       (those are returns, not contributions).
+     - Net Worth line stays nominal (`Balance (PKR)` sum). Both lines nominal now
+       → gap = true returns.
+   - File: [docs/app.js](docs/app.js) → `renderGrowth`
+     - Rename dataset label "Savings Invested (Real)" → **"Savings Invested"**
+       (drop "(Real)", it is nominal now). Tooltip "Return component" wording is
+       now accurate — keep it.
+   - **Requires a GitHub Actions workflow run** (block_e is sheet data written by
+     the Python pipeline, not computed client-side).
+   - Verify latest month: savings ≈ 1,648,647, NW ≈ 1,699,425, gap ≈ 50,778 (~3%).
+
 > When applying: bump the service-worker cache (`docs/sw.js` `CACHE = 'finance-vN'`).
+> Items touching Python (6) also need the workflow re-run to refresh sheet data.
 
 ### Note — label name (item 3)
 Confirmed: **"EOY Forecast"**.
