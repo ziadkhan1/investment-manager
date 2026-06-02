@@ -308,18 +308,50 @@ function renderCashFlow(vr) {
   const savings  = rows.map((r) => parseFloat(r[3]) || 0);
 
   mkChart('chart-cashflow', {
-    type: 'line',
+    type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Income',   data: income,   borderColor: c('green', '.9'),  backgroundColor: 'transparent', tension: .35, pointRadius: 2, pointStyle: 'line' },
-        { label: 'Expenses', data: expenses, borderColor: c('red', '.9'),    backgroundColor: 'transparent', tension: .35, pointRadius: 2, pointStyle: 'line' },
-        { label: 'Net Savings', data: savings, borderColor: c('blue', '.9'), backgroundColor: c('blue', '.07'), fill: true, tension: .35, pointRadius: 2, pointStyle: 'line' },
+        {
+          label: 'Income',
+          data: income,
+          backgroundColor: c('green', '.65'),
+          borderColor: c('green', '.9'),
+          borderWidth: 1,
+          borderRadius: 3,
+          categoryPercentage: 0.7,
+          barPercentage: 0.9,
+          order: 2,
+        },
+        {
+          label: 'Expenses',
+          data: expenses,
+          backgroundColor: c('red', '.6'),
+          borderColor: c('red', '.9'),
+          borderWidth: 1,
+          borderRadius: 3,
+          categoryPercentage: 0.7,
+          barPercentage: 0.9,
+          order: 2,
+        },
+        {
+          label: 'Net Savings',
+          type: 'line',
+          data: savings,
+          borderColor: c('blue', '.9'),
+          backgroundColor: c('blue', '.9'),
+          tension: .35,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          pointStyle: 'circle',
+          order: 1,
+        },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: legend('bottom', true) },
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: legend('bottom') },
       scales: { x: xAxis(), y: yAxis() },
     },
   });
