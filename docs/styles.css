@@ -256,7 +256,12 @@ header {
 .chart-wrap {
   height: 210px;
   position: relative;
+  width: 100%;
 }
+
+/* Chart.js renders into these canvases; never let one exceed its container
+   (the classic cause of a canvas pushing the whole page wider than the screen). */
+.chart-wrap canvas { max-width: 100% !important; }
 
 .chart-wrap-tall {
   height: 230px;
@@ -332,7 +337,7 @@ header {
 .toast.hidden { display: none; }
 
 /* ── Mobile / Android ──────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   /* allow header to grow instead of clipping wrapped metrics */
   header {
     height: auto;
@@ -341,7 +346,7 @@ header {
     align-items: flex-start;
   }
 
-  .nw-block { padding-top: .15rem; }
+  .nw-block { padding-top: .15rem; min-width: 0; }
 
   /* slightly smaller headline so it doesn't crowd the refresh button */
   .nw-primary { font-size: 1.2rem; }
@@ -360,9 +365,6 @@ header {
     padding: .875rem .875rem .75rem;
     border-radius: 14px;
   }
-
-  /* safety net: never let a canvas push the page wider */
-  canvas { max-width: 100%; }
 }
 
 /* ── Safe area insets (iPhone notch etc.) ──────────────────────────────────── */
