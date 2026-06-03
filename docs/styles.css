@@ -24,6 +24,7 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
 /* ── Screens ───────────────────────────────────────────────────────────────── */
@@ -38,6 +39,7 @@ html, body {
 }
 #dashboard-screen {
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -328,6 +330,40 @@ header {
 }
 
 .toast.hidden { display: none; }
+
+/* ── Mobile / Android ──────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* allow header to grow instead of clipping wrapped metrics */
+  header {
+    height: auto;
+    min-height: var(--header-h);
+    padding: .6rem .75rem;
+    align-items: flex-start;
+  }
+
+  .nw-block { padding-top: .15rem; }
+
+  /* slightly smaller headline so it doesn't crowd the refresh button */
+  .nw-primary { font-size: 1.2rem; }
+
+  /* let metrics wrap onto a second line rather than overflow */
+  .nw-metrics { flex-wrap: wrap; row-gap: .35rem; }
+
+  /* hide the timestamp — it just eats header space on small screens */
+  .last-updated { display: none; }
+
+  /* tighter outer padding so cards reach edge-to-edge */
+  #charts-container { padding: .75rem; gap: .75rem; }
+
+  /* slightly smaller card radius + padding on narrow screens */
+  .chart-card {
+    padding: .875rem .875rem .75rem;
+    border-radius: 14px;
+  }
+
+  /* safety net: never let a canvas push the page wider */
+  canvas { max-width: 100%; }
+}
 
 /* ── Safe area insets (iPhone notch etc.) ──────────────────────────────────── */
 @supports (padding: env(safe-area-inset-bottom)) {
