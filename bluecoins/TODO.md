@@ -10,6 +10,12 @@ _(none)_
 
 ## Done
 
+Layout change (commit `5c7db25`+):
+
+-2. **Swap Portfolio Health ↔ Net Worth vs Savings; Row 1 now 50-50** — Net Worth
+   vs Savings moved up beside Net Worth (both `col-half`, `chart-wrap-row1`);
+   Portfolio Health moved down beside Income vs Expenses. sw.js cache v16 → v17.
+
 Layout change (commit `60d61ce`):
 
 -1. **Income vs Expenses + Net Worth vs Savings on one row** — merged the two

@@ -63,26 +63,26 @@
 
     <main id="charts-container">
 
-      <!-- ── Row 1: NW (66%) + Portfolio Health (33%) ───────────────────────── -->
+      <!-- ── Row 1: Net Worth (50%) + Net Worth vs Savings (50%) ─────────────── -->
       <div class="row-split">
 
-        <div class="chart-card col-wide">
+        <div class="chart-card col-half">
           <div class="card-header">
             <span class="card-title">Net Worth</span>
           </div>
           <div class="chart-wrap chart-wrap-row1"><canvas id="chart-nw"></canvas></div>
         </div>
 
-        <div class="chart-card col-narrow">
+        <div class="chart-card col-half">
           <div class="card-header">
-            <span class="card-title">Portfolio Health</span>
+            <span class="card-title">Net Worth vs Savings Invested</span>
           </div>
-          <div class="chart-wrap chart-wrap-row1"><canvas id="chart-contribution"></canvas></div>
+          <div class="chart-wrap chart-wrap-row1"><canvas id="chart-growth"></canvas></div>
         </div>
 
       </div>
 
-      <!-- ── Income vs Expenses (50%) + Net Worth vs Savings (50%) ────────────── -->
+      <!-- ── Income vs Expenses (50%) + Portfolio Health (50%) ────────────────── -->
       <div class="row-split">
 
         <div class="chart-card col-half">
@@ -94,9 +94,9 @@
 
         <div class="chart-card col-half">
           <div class="card-header">
-            <span class="card-title">Net Worth vs Savings Invested</span>
+            <span class="card-title">Portfolio Health</span>
           </div>
-          <div class="chart-wrap"><canvas id="chart-growth"></canvas></div>
+          <div class="chart-wrap"><canvas id="chart-contribution"></canvas></div>
         </div>
 
       </div>
