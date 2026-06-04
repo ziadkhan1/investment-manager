@@ -503,16 +503,32 @@ function renderContribution(vr) {
   const realGain   = currentBal.map((b, i) => b - inflFloor[i]);
   const realPct    = realGain.map((rg, i) => inflFloor[i] !== 0 ? (rg / Math.abs(inflFloor[i])) * 100 : 0);
 
+  // Sort all accounts by real % performance (best at top).
+  // Bank accounts use realPct (inflation erosion) as their rank key — nomReturn
+  // stays 0 for them so the bars are unchanged; only their position in the list changes.
+  const order = Array.from({ length: labels.length }, (_, i) => i)
+    .sort((a, b) => realPct[b] - realPct[a]);
+  const reorder = (arr) => order.map((i) => arr[i]);
+
+  const labels_s    = reorder(labels);
+  const nominal_s   = reorder(nominal);
+  const nomReturn_s = reorder(nomReturn);
+  const inflFloor_s = reorder(inflFloor);
+  const kind_s      = reorder(kind);
+  const currentBal_s = reorder(currentBal);
+  const realGain_s  = reorder(realGain);
+  const realPct_s   = reorder(realPct);
+
   // Gain:  blue = nominal deposits,   green extends to current value
   // Loss:  blue = current value,      red extends to nominal deposits
-  const blueData  = nominal.map((n, i) => nomReturn[i] >= 0 ? n : currentBal[i]);
-  const greenData = nomReturn.map((r) => Math.max(r, 0));
-  const redData   = nomReturn.map((r) => r < 0 ? Math.abs(r) : 0);
+  const blueData  = nominal_s.map((n, i) => nomReturn_s[i] >= 0 ? n : currentBal_s[i]);
+  const greenData = nomReturn_s.map((r) => Math.max(r, 0));
+  const redData   = nomReturn_s.map((r) => r < 0 ? Math.abs(r) : 0);
 
-  const xMax = Math.ceil(Math.max(...currentBal, ...nominal, ...inflFloor) / 50000) * 50000;
+  const xMax = Math.ceil(Math.max(...currentBal_s, ...nominal_s, ...inflFloor_s) / 50000) * 50000;
 
   const annotations = Object.fromEntries(
-    inflFloor.map((floor, i) => [
+    inflFloor_s.map((floor, i) => [
       `floor${i}`,
       {
         type:        'line',
@@ -539,7 +555,7 @@ function renderContribution(vr) {
 
   const sgn    = (v) => (v >= 0 ? '+' : '−') + fmtPKR(Math.abs(v));
   const fmtPct = (v) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%';
-  const makeLabel = (i) => [fmtPKR(currentBal[i]), `${fmtPct(realPct[i])} real`];
+  const makeLabel = (i) => [fmtPKR(currentBal_s[i]), `${fmtPct(realPct_s[i])} real`];
 
   const labelCfg = {
     anchor: 'end', align: 'right', padding: { left: 6 },
@@ -550,7 +566,7 @@ function renderContribution(vr) {
   mkChart('chart-contribution', {
     type: 'bar',
     data: {
-      labels,
+      labels: labels_s,
       datasets: [
         {
           label: 'Invested',
@@ -559,8 +575,8 @@ function renderContribution(vr) {
           stack: 'rc',
           datalabels: {
             ...labelCfg,
-            display:   (ctx) => kind[ctx.dataIndex] === 'bank',
-            formatter: (_, ctx) => fmtPKR(currentBal[ctx.dataIndex]),
+            display:   (ctx) => kind_s[ctx.dataIndex] === 'bank',
+            formatter: (_, ctx) => fmtPKR(currentBal_s[ctx.dataIndex]),
           },
         },
         {
@@ -590,13 +606,13 @@ function renderContribution(vr) {
           callbacks: {
             label: (item) => {
               const i   = item.dataIndex;
-              const rp  = realPct[i];
+              const rp  = realPct_s[i];
               const rgStr = rp >= 0
                 ? ` Real gain:  +${Math.abs(rp).toFixed(1)}%`
                 : ` Real loss:   −${Math.abs(rp).toFixed(1)}%`;
-              if (item.datasetIndex === 0) return ` Invested:   PKR ${fmtN(nominal[i])}`;
-              if (item.datasetIndex === 1) return [` Profit:    +PKR ${fmtN(nomReturn[i])}`, rgStr];
-              return [` Loss:       PKR ${fmtN(nomReturn[i])}`, rgStr];
+              if (item.datasetIndex === 0) return ` Invested:   PKR ${fmtN(nominal_s[i])}`;
+              if (item.datasetIndex === 1) return [` Profit:    +PKR ${fmtN(nomReturn_s[i])}`, rgStr];
+              return [` Loss:       PKR ${fmtN(nomReturn_s[i])}`, rgStr];
             },
           },
         },

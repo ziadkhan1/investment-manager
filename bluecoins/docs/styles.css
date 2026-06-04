@@ -280,6 +280,14 @@ header {
   height: max(165px, calc((100vh - var(--vfit-overhead)) * 230 / 650));
 }
 
+/* Portfolio Health is a horizontal bar chart with ~14 account rows — needs a
+   higher floor than general charts so all bars are visible on shorter screens. */
+.chart-wrap-ph {
+  height: max(260px, calc((100vh - var(--vfit-overhead)) * 230 / 650));
+  position: relative;
+  width: 100%;
+}
+
 .chart-wrap-row1 {
   height: max(165px, calc((100vh - var(--vfit-overhead)) * 230 / 650));
   position: relative;
@@ -302,6 +310,7 @@ header {
   .chart-wrap,
   .chart-wrap-row1,
   .chart-wrap-tall { height: 210px; }
+  .chart-wrap-ph   { height: 280px; }
 }
 
 /* ── Loading overlay ───────────────────────────────────────────────────────── */
