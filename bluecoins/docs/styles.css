@@ -15,6 +15,9 @@
   --subtext:     #94A3B8;
   --muted:       #475569;
   --header-h:    80px;
+  /* Vertical chrome to subtract so all 3 chart rows fit in one viewport
+     (header + container padding + 2 row-gaps + 3× card header/padding). */
+  --vfit-overhead: 330px;
 }
 
 html, body {
@@ -222,7 +225,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: .875rem;
-  padding-bottom: 2rem;
+  padding-bottom: 1rem;
 }
 
 /* ── Chart card ────────────────────────────────────────────────────────────── */
@@ -260,8 +263,11 @@ header {
 .bar-badge   { background: rgba(139,92,246,.15);  color: #a78bfa; }
 .green-badge { background: rgba(16,185,129,.15);  color: #34d399; }
 
+/* Heights scale to the viewport so all 3 rows fit without scrolling.
+   The remaining height (after fixed chrome) is split across rows in the
+   original 230:210:210 proportion; max() floors them on very short screens. */
 .chart-wrap {
-  height: 210px;
+  height: max(150px, calc((100vh - var(--vfit-overhead)) * 210 / 650));
   position: relative;
   width: 100%;
 }
@@ -271,11 +277,11 @@ header {
 .chart-wrap canvas { max-width: 100% !important; }
 
 .chart-wrap-tall {
-  height: 230px;
+  height: max(165px, calc((100vh - var(--vfit-overhead)) * 230 / 650));
 }
 
 .chart-wrap-row1 {
-  height: 230px;
+  height: max(165px, calc((100vh - var(--vfit-overhead)) * 230 / 650));
   position: relative;
 }
 
@@ -291,6 +297,11 @@ header {
 
 @media (max-width: 600px) {
   .row-split { flex-direction: column; }
+  /* On mobile the rows stack into 6 charts — keep fixed heights and let the
+     page scroll rather than crushing every chart to fit one screen. */
+  .chart-wrap,
+  .chart-wrap-row1,
+  .chart-wrap-tall { height: 210px; }
 }
 
 /* ── Loading overlay ───────────────────────────────────────────────────────── */

@@ -10,6 +10,12 @@ _(none)_
 
 ## Done
 
+Layout change (commit `11a7617`+):
+
+-3. **Fit all 3 chart rows in one viewport (no scroll)** — chart heights switched
+   from fixed px to `max(floor, calc((100vh - 330px) * ratio / 650))`, preserving
+   the 230:210:210 proportion; mobile keeps fixed 210px + scroll. sw.js v17 → v18.
+
 Layout change (commit `5c7db25`+):
 
 -2. **Swap Portfolio Health ↔ Net Worth vs Savings; Row 1 now 50-50** — Net Worth
