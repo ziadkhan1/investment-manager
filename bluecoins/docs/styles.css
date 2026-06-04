@@ -287,6 +287,7 @@ header {
 }
 .col-wide   { flex: 2; min-width: 0; }
 .col-narrow { flex: 1; min-width: 0; }
+.col-half   { flex: 1; min-width: 0; }
 
 @media (max-width: 600px) {
   .row-split { flex-direction: column; }
