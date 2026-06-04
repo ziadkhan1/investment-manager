@@ -10,6 +10,18 @@ _(none)_
 
 ## Done
 
+Layout change (commit pending):
+
+-1. **Income vs Expenses + Net Worth vs Savings on one row** — merged the two
+   standalone cards into a `.row-split` (50-50, `.col-half`); stacks on mobile.
+   sw.js cache bumped v15 → v16.
+
+Layout change (commit `b07f364`):
+
+0. **Asset Allocation + Currency Exposure on one row** — both wrapped in a
+   `.row-split` with new `.col-half` class (50-50 split); stacks on mobile.
+   sw.js cache bumped v14 → v15.
+
 Applied together in the chart-cleanup change request:
 
 1. **Currency Exposure area — stacking order** — Hard Currency now on the bottom,
