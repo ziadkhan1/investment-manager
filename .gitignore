@@ -3,6 +3,9 @@
 .env
 secrets/
 
+# …but the PWA manifest is not a secret and must ship to GitHub Pages
+!bluecoins/docs/manifest.json
+
 # Bluecoins database exports
 *.fydb
 
