@@ -10,6 +10,12 @@ _(none)_
 
 ## Done
 
+CI change (commit `5f59ca8`):
+
+-4. **Workflow run frequency → 4×/day** — `networth.yml` cron changed from
+   `0 3 * * *` (once daily, 08:00 PKT) to `0 3,9,15,21 * * *` (every 6h:
+   08:00 / 14:00 / 20:00 / 02:00 PKT). No dashboard/sw.js change.
+
 Layout change (commit `11a7617`+):
 
 -3. **Fit all 3 chart rows in one viewport (no scroll)** — chart heights switched
