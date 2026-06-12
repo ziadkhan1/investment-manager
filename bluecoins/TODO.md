@@ -10,6 +10,15 @@ _(none)_
 
 ## Done
 
+Feature change (guest-login request):
+
+-5. **Guest login with anonymised data** — added a "Continue as guest" button on
+   the sign-in screen. Guests get **no Google access token**, so the real Sheet is
+   never contacted; `batchGet` short-circuits to `demoBatchGet`, which serves a
+   structurally identical **synthetic** dataset (fabricated numbers, regenerated
+   on refresh). A "Sample data" pill shows in the header during guest mode.
+   sw.js cache v19 → v20.
+
 CI change (commit `5f59ca8`):
 
 -4. **Workflow run frequency → 4×/day** — `networth.yml` cron changed from

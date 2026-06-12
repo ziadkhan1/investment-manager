@@ -98,12 +98,62 @@ html, body {
 }
 .btn-primary:active { transform: scale(.97); opacity: .9; }
 
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background: transparent;
+  color: var(--subtext);
+  border: 1px solid var(--card-border);
+  padding: .8rem 2.2rem;
+  border-radius: 14px;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.btn-ghost:active { background: var(--card); color: var(--text); border-color: var(--muted); }
+
+/* "or" divider between the two sign-in options */
+.signin-divider {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.signin-divider::before,
+.signin-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--card-border);
+}
+
 .hint {
   margin-top: 1.25rem !important;
   font-size: .78rem !important;
   color: var(--muted) !important;
   line-height: 1.5;
 }
+
+/* Header pill shown only in guest mode */
+.guest-badge {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: .25rem .55rem;
+  border-radius: 6px;
+  background: rgba(245,158,11,.15);
+  color: var(--yellow);
+  white-space: nowrap;
+}
+.guest-badge.hidden { display: none; }
 
 /* ── Header ────────────────────────────────────────────────────────────────── */
 header {

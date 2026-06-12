@@ -25,7 +25,9 @@
       <h1>Finance Dashboard</h1>
       <p>Live view of your portfolio</p>
       <button id="signin-btn" class="btn-primary">Sign in with Google</button>
-      <p class="hint">Use the Google account that has access to your Finance sheet</p>
+      <div class="signin-divider"><span>or</span></div>
+      <button id="guest-btn" class="btn-ghost">Continue as guest</button>
+      <p class="hint">Sign in with the Google account that has access to your Finance sheet — or continue as a guest to explore the dashboard with sample, anonymised data.</p>
     </div>
   </div>
 
@@ -56,6 +58,7 @@
         </div>
       </div>
       <div class="header-actions">
+        <span id="guest-badge" class="guest-badge hidden">Sample data</span>
         <span id="last-updated" class="last-updated"></span>
         <button id="refresh-btn" class="btn-icon" title="Refresh">↻</button>
       </div>

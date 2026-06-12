@@ -14,6 +14,8 @@ const CFG = {
 // ── State ─────────────────────────────────────────────────────────────────────
 let tokenClient = null;
 let accessToken = null;
+let guestMode   = false;   // true = no auth, render synthetic anonymised data
+let demoCache   = null;    // cached synthetic dataset for the current guest session
 const charts    = {};
 
 // ── Utility ───────────────────────────────────────────────────────────────────
@@ -81,13 +83,29 @@ function initAuth() {
   });
 
   $('refresh-btn').addEventListener('click', () => {
+    if (guestMode) { demoCache = null; fetchAndRender(); return; }  // reshuffle sample data
     if (accessToken) fetchAndRender();
     else tokenClient.requestAccessToken({ prompt: '' });
   });
 }
 
+// ── Guest mode entry (no Google auth) ───────────────────────────────────────────
+function enterGuestMode() {
+  guestMode   = true;
+  accessToken = null;
+  demoCache   = null;
+  $('signin-screen').classList.remove('active');
+  $('dashboard-screen').classList.add('active');
+  $('guest-badge').classList.remove('hidden');
+  fetchAndRender();
+}
+
 // ── Sheets API ────────────────────────────────────────────────────────────────
 async function batchGet(ranges) {
+  // Guests never hold an access token, so no real Sheet is ever contacted —
+  // serve a structurally identical synthetic dataset instead.
+  if (guestMode) return demoBatchGet(ranges);
+
   const params = new URLSearchParams();
   ranges.forEach((r) => params.append('ranges', r));
   const url =
@@ -128,6 +146,95 @@ function parseBlock(valueRange, monthOnly = false) {
       return true;
     }),
   };
+}
+
+// ── Guest mode: synthetic anonymised data ──────────────────────────────────────
+// Builds a full, internally consistent fake portfolio with the SAME shape as the
+// real Sheet blocks, so every chart renders normally — but with fictional numbers.
+// Net worth ≈ allocation total ≈ exposure total ≈ growth NW across blocks.
+function buildDemoData() {
+  const rint = (lo, hi) => Math.round(lo + Math.random() * (hi - lo));
+
+  const N      = 18;                                            // months of history
+  const months = Array.from({ length: N }, (_, i) => addMonths(NOW_MONTH, i - (N - 1)));
+
+  let nw         = rint(1600000, 2000000);   // starting nominal net worth (fake PKR)
+  let realFloor  = nw - rint(20000, 60000);  // inflation-adjusted floor
+  let cumSavings = nw - rint(150000, 300000);// cumulative savings invested baseline
+
+  const A = [], B = [], C = [], D = [], E = [];
+  months.forEach((m) => {
+    const income      = rint(300000, 430000);
+    const expenses    = rint(170000, 270000);
+    const savings     = income - expenses;
+    const ret         = rint(-35000, 95000);                   // monthly market move
+    nw         += savings + ret;
+    cumSavings += savings;
+    realFloor  += Math.round(savings * 0.82) + rint(-8000, 4000);
+    const savingsRate = Math.round((savings / income) * 100);
+
+    A.push([m, nw, realFloor]);
+    B.push([m, income, expenses, savings, savingsRate]);
+
+    // Asset allocation — split NW into 5 categories that sum back to NW
+    const inv  = Math.round(nw * (0.40 + Math.random() * 0.06));
+    const fx   = Math.round(nw * (0.14 + Math.random() * 0.04));
+    const gold = Math.round(nw * (0.07 + Math.random() * 0.03));
+    const recv = Math.round(nw * 0.04);
+    const cash = nw - inv - fx - gold - recv;
+    C.push([m, cash, inv, fx, gold, recv]);
+
+    const hard = fx + gold;                                    // hard-currency exposure
+    D.push([m, hard, nw - hard]);
+
+    E.push([m, nw, cumSavings]);
+  });
+
+  // Portfolio Health — fake accounts: [name, invested, return(signed), floor, _, _, kind]
+  const F = [
+    ['Account',      'Invested', 'Return', 'Floor', '', '', 'Kind'],
+    ['Equity Fund',     900000,   182000,  965000, '', '', 'invest'],
+    ['Index Fund',      540000,   124000,  560000, '', '', 'invest'],
+    ['Gold Holding',    300000,    96000,  331000, '', '', 'invest'],
+    ['Bond Fund',       650000,    71000,  694000, '', '', 'invest'],
+    ['FX Savings',      420000,   -26000,  468000, '', '', 'invest'],
+    ['Main Bank',       360000,        0,  409000, '', '', 'bank'],
+    ['Savings Bank',    220000,        0,  251000, '', '', 'bank'],
+    ['Wallet',           62000,        0,   71000, '', '', 'bank'],
+  ];
+
+  return { A, B, C, D, E, F };
+}
+
+// Returns the same { valueRanges: [...] } shape as the live Sheets batchGet,
+// matching each requested A1 range to the right synthetic block by its columns.
+function demoBatchGet(ranges) {
+  if (!demoCache) demoCache = buildDemoData();
+  const d = demoCache;
+
+  const HDR = {
+    A: ['Month', 'Nominal', 'Real'],
+    B: ['Month', 'Income', 'Expenses', 'Savings', 'Rate'],
+    C: ['Month', 'Cash/PKR', 'Investments', 'Foreign', 'Gold', 'Receivables'],
+    D: ['Month', 'Hard', 'PKR'],
+    E: ['Month', 'Net Worth', 'Savings Invested'],
+  };
+
+  const valueRanges = ranges.map((r) => {
+    const m     = r.match(/![A-Z$]*?([A-Z]+)\d+(?::\$?([A-Z]+)\d*)?/);
+    const start = m?.[1] || '';
+    const end   = m?.[2] || start;
+    if (start === 'A' && end === 'C') return { values: [HDR.A, ...d.A] };
+    if (start === 'E')                return { values: [HDR.B, ...d.B] };
+    if (start === 'K')                return { values: [HDR.C, ...d.C] };
+    if (start === 'R')                return { values: [HDR.D, ...d.D] };
+    if (start === 'V')                return { values: [HDR.E, ...d.E] };
+    if (start === 'Y')                return { values: [['CAGR', ''], ['Nominal', 18.4], ['Real', 6.1]] };
+    if (start === 'A' && end === 'G') return { values: d.F };
+    return { values: [] };
+  });
+
+  return Promise.resolve({ valueRanges });
 }
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────
@@ -695,6 +802,9 @@ async function fetchAndRender() {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
+  // Guest entry needs no Google library — wire it immediately.
+  $('guest-btn').addEventListener('click', enterGuestMode);
+
   // GIS loads async — poll until ready
   const wait = setInterval(() => {
     if (window.google?.accounts?.oauth2) {
