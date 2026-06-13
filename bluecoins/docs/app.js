@@ -607,13 +607,11 @@ function renderExposure(vr) {
   });
 }
 
-// ── Chart 5: Return Gap (Net Worth as flat reference, savings as the gap) ─────
-// Net Worth is drawn as a constant reference line at y=0. The "Net Savings
-// Invested" line is plotted as its difference from that reference
-// (savings − net worth), so the vertical gap to the zero line is exactly the
-// cumulative investment return. Removing the shared growth trend makes it easy
-// to read how returns build (or lag) over time instead of two near-parallel
-// lines climbing together.
+// ── Chart 5: Investment Earnings vs Savings ──────────────────────────────────
+// Total savings invested (what you put in from salary) is drawn as a flat
+// reference line at y=0. The line above it is net worth − savings = the slice
+// of net worth that came from investment earnings, so you can read directly how
+// much of your wealth was *earned* by investments versus *saved* from salary.
 function renderGrowth(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
@@ -622,13 +620,13 @@ function renderGrowth(vr) {
   const nw      = rows.map((r) => parseFloat(r[1]) || 0);
   const savings = rows.map((r) => parseFloat(r[2]) || 0);
 
-  // Difference of savings from the net-worth reference. Negative when
-  // investments have added value (net worth above pure savings); positive when
-  // savings would have left you better off (returns lagged).
-  const gap = savings.map((s, i) => s - nw[i]);
+  // Investment earnings = how far net worth sits above the savings reference.
+  // Positive when investments have added value; negative if they ever fall
+  // behind what was contributed.
+  const earnings = nw.map((v, i) => v - savings[i]);
 
   // Signed PKR formatter — the shared fmtPKR() strips the sign via Math.abs(),
-  // which would make every tick on this (negative) axis read as positive.
+  // so a dip below the reference would otherwise read as positive.
   const fmtSigned = (v) => (v < 0 ? '−' : '') + fmtPKR(v);
 
   mkChart('chart-growth', {
@@ -637,29 +635,30 @@ function renderGrowth(vr) {
       labels,
       datasets: [
         {
-          label: 'Net Worth (reference)',
+          label: 'Total Savings Invested (reference)',
           data: labels.map(() => 0),
-          borderColor: c('blue', '.9'),
+          borderColor: c('yellow', '.85'),
           backgroundColor: 'transparent',
           borderWidth: 2,
+          borderDash: [5, 4],
           fill: false, tension: 0, pointRadius: 0,
           pointStyle: 'line',
         },
         {
-          label: 'Net Savings Invested (vs Net Worth)',
-          data: gap,
+          label: 'Earned from Investments',
+          data: earnings,
           borderColor: c('green', '.85'),
-          // Shade the gap between the savings line and the reference — this band
-          // IS the investment return at each month.
+          // Shade the gap above the savings line — this band IS the portion of
+          // net worth earned by investments at each month.
           backgroundColor: c('green', '.12'),
           fill: 'origin',
           tension: .35, pointRadius: 2,
           pointStyle: 'line',
-          // Colour the line red over any stretch where savings beat net worth
-          // (returns lagged, i.e. the gap rises above the reference).
+          // Colour the line red over any stretch where investments fall behind
+          // contributions (earnings drop below the reference).
           segment: {
             borderColor: (ctx) =>
-              ctx.p0.parsed.y > 0 ? c('red', '.85') : c('green', '.85'),
+              ctx.p0.parsed.y < 0 ? c('red', '.85') : c('green', '.85'),
           },
         },
       ],
@@ -673,15 +672,16 @@ function renderGrowth(vr) {
             label: (item) => {
               const i = item.dataIndex;
               return item.datasetIndex === 0
-                ? ` Net Worth: ${fmtPKRFull(nw[i])}`
-                : ` Savings invested: ${fmtPKRFull(savings[i])}`;
+                ? ` Savings invested: ${fmtPKRFull(savings[i])}`
+                : ` Net worth: ${fmtPKRFull(nw[i])}`;
             },
             afterBody: (items) => {
-              const i   = items[0].dataIndex;
-              const ret = nw[i] - savings[i];
-              return ret >= 0
-                ? `Investment return: +${fmtPKRFull(ret)}`
-                : `Below savings: −${fmtPKRFull(Math.abs(ret))}`;
+              const i    = items[0].dataIndex;
+              const earn = nw[i] - savings[i];
+              const pct  = nw[i] ? Math.round((earn / nw[i]) * 100) : 0;
+              return earn >= 0
+                ? `Earned from investments: +${fmtPKRFull(earn)} (${pct}% of net worth)`
+                : `Investments behind: −${fmtPKRFull(Math.abs(earn))}`;
             },
           },
         },
