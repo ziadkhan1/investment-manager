@@ -568,11 +568,10 @@ function renderExposure(vr) {
         const total = hard[i] + pkrA[i];
         return total ? Math.round((value / total) * 100) + '%' : null;
       },
-      color: '#fff',
-      // No background pill — a soft shadow keeps the text legible over the area.
-      textShadowColor: 'rgba(0,0,0,.6)',
-      textShadowBlur: 4,
-      font: { size: 10, weight: 'bold' },
+      color: 'rgba(255,255,255,.78)',
+      textShadowColor: 'rgba(0,0,0,.5)',
+      textShadowBlur: 3,
+      font: { size: 9 },
       ...dl,
     },
   });
