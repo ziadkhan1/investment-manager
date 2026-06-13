@@ -1,6 +1,9 @@
-name: Deploy Dashboard (GitHub Pages)
+name: Deploy Sites (GitHub Pages)
 
-# Publishes the static dashboard in bluecoins/docs to GitHub Pages.
+# Publishes all static apps to GitHub Pages as a combined site:
+#   /                   → bluecoins/docs  (Finance Dashboard)
+#   /project-tracker/  → project-tracker/docs
+#
 # Required one-time setting: repo → Settings → Pages → Source = "GitHub Actions".
 
 on:
@@ -8,6 +11,7 @@ on:
     branches: [main]
     paths:
       - "bluecoins/docs/**"
+      - "project-tracker/docs/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -31,10 +35,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload dashboard artifact
+      - name: Build combined site
+        run: |
+          mkdir -p site
+          cp -r bluecoins/docs/. site/
+          mkdir -p site/project-tracker
+          cp -r project-tracker/docs/. site/project-tracker/
+
+      - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: bluecoins/docs
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
