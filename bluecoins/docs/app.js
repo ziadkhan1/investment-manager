@@ -541,7 +541,13 @@ function renderExposure(vr) {
   });
 }
 
-// ── Chart 5: Growth Attribution (NW line vs Savings baseline) ────────────────
+// ── Chart 5: Return Gap (Net Worth as flat reference, savings as the gap) ─────
+// Net Worth is drawn as a constant reference line at y=0. The "Net Savings
+// Invested" line is plotted as its difference from that reference
+// (savings − net worth), so the vertical gap to the zero line is exactly the
+// cumulative investment return. Removing the shared growth trend makes it easy
+// to read how returns build (or lag) over time instead of two near-parallel
+// lines climbing together.
 function renderGrowth(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
@@ -550,26 +556,45 @@ function renderGrowth(vr) {
   const nw      = rows.map((r) => parseFloat(r[1]) || 0);
   const savings = rows.map((r) => parseFloat(r[2]) || 0);
 
+  // Difference of savings from the net-worth reference. Negative when
+  // investments have added value (net worth above pure savings); positive when
+  // savings would have left you better off (returns lagged).
+  const gap = savings.map((s, i) => s - nw[i]);
+
+  // Signed PKR formatter — the shared fmtPKR() strips the sign via Math.abs(),
+  // which would make every tick on this (negative) axis read as positive.
+  const fmtSigned = (v) => (v < 0 ? '−' : '') + fmtPKR(v);
+
   mkChart('chart-growth', {
     type: 'line',
     data: {
       labels,
       datasets: [
         {
-          label: 'Net Worth (PKR)',
-          data: nw,
+          label: 'Net Worth (reference)',
+          data: labels.map(() => 0),
           borderColor: c('blue', '.9'),
-          backgroundColor: c('blue', '.10'),
-          fill: true, tension: .35, pointRadius: 2,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false, tension: 0, pointRadius: 0,
           pointStyle: 'line',
         },
         {
-          label: 'Savings Invested',
-          data: savings,
-          borderColor: c('yellow', '.8'),
-          backgroundColor: 'transparent',
-          borderDash: [5, 4], tension: .35, pointRadius: 2,
+          label: 'Net Savings Invested (vs Net Worth)',
+          data: gap,
+          borderColor: c('green', '.85'),
+          // Shade the gap between the savings line and the reference — this band
+          // IS the investment return at each month.
+          backgroundColor: c('green', '.12'),
+          fill: 'origin',
+          tension: .35, pointRadius: 2,
           pointStyle: 'line',
+          // Colour the line red over any stretch where savings beat net worth
+          // (returns lagged, i.e. the gap rises above the reference).
+          segment: {
+            borderColor: (ctx) =>
+              ctx.p0.parsed.y > 0 ? c('red', '.85') : c('green', '.85'),
+          },
         },
       ],
     },
@@ -579,18 +604,23 @@ function renderGrowth(vr) {
         legend: legend('bottom', true),
         tooltip: {
           callbacks: {
+            label: (item) => {
+              const i = item.dataIndex;
+              return item.datasetIndex === 0
+                ? ` Net Worth: ${fmtPKRFull(nw[i])}`
+                : ` Savings invested: ${fmtPKRFull(savings[i])}`;
+            },
             afterBody: (items) => {
-              const nwVal  = items.find((i) => i.datasetIndex === 0)?.raw || 0;
-              const savVal = items.find((i) => i.datasetIndex === 1)?.raw || 0;
-              const ret    = nwVal - savVal;
+              const i   = items[0].dataIndex;
+              const ret = nw[i] - savings[i];
               return ret >= 0
-                ? `Return component: +${fmtPKR(ret)}`
-                : `Below savings: ${fmtPKR(ret)}`;
+                ? `Investment return: +${fmtPKRFull(ret)}`
+                : `Below savings: −${fmtPKRFull(Math.abs(ret))}`;
             },
           },
         },
       },
-      scales: { x: xAxis(), y: yAxis() },
+      scales: { x: xAxis(), y: yAxis({ ticks: { ...TICK, callback: fmtSigned } }) },
     },
   });
 }
