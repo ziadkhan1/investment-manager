@@ -509,7 +509,19 @@ function renderExposure(vr) {
   const hard   = rows.map((r) => parseFloat(r[1]) || 0);
   const pkrA   = rows.map((r) => parseFloat(r[2]) || 0);
 
-  const area = (label, data, color) => ({
+  // Show % share labels at a handful of evenly spaced months (inset from the
+  // left edge, always including the latest month) — enough to read the trend
+  // without cluttering every point.
+  const LABEL_COUNT = 4;
+  const last  = labels.length - 1;
+  const start = Math.min(2, last);
+  const span  = last - start;
+  const labelIdx = new Set(
+    Array.from({ length: LABEL_COUNT }, (_, k) =>
+      start + (span ? Math.round((k * span) / (LABEL_COUNT - 1)) : 0))
+  );
+
+  const area = (label, data, color, dl) => ({
     label, data,
     backgroundColor: c(color, '.5'),
     borderColor: c(color, '.85'),
@@ -518,20 +530,43 @@ function renderExposure(vr) {
     tension: .3,
     pointRadius: 0,
     pointHoverRadius: 4,
+    datalabels: {
+      display: (ctx) => labelIdx.has(ctx.dataIndex),
+      formatter: (value, ctx) => {
+        const i = ctx.dataIndex;
+        const total = hard[i] + pkrA[i];
+        return total ? Math.round((value / total) * 100) + '%' : null;
+      },
+      color: '#fff',
+      backgroundColor: c(color, '.9'),
+      borderRadius: 4,
+      padding: { top: 2, bottom: 2, left: 5, right: 5 },
+      font: { size: 10, weight: 'bold' },
+      ...dl,
+    },
   });
 
   mkChart('chart-exposure', {
     type: 'line',
+    // The datalabels plugin is loaded but never globally registered, so enable
+    // it inline for just this chart (per-dataset display() drives which months
+    // actually show a label).
+    plugins: window.ChartDataLabels ? [window.ChartDataLabels] : [],
     data: {
       labels,
       datasets: [
-        area('Hard Currency (GBP/USD/Gold)', hard, 'purple'),
-        area('PKR Assets',                   pkrA, 'blue'),
+        // PKR sits on top of the stack → label above the top line; hard
+        // currency is the lower band → label tucked just under the boundary.
+        area('Hard Currency (GBP/USD/Gold)', hard, 'purple',
+             { anchor: 'center', align: 'bottom', offset: 2, clamp: true }),
+        area('PKR Assets',                   pkrA, 'blue',
+             { anchor: 'end', align: 'top', offset: 2, clamp: true }),
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' },
+      layout: { padding: { top: 16, right: 26 } },  // room for top + last-month % labels
       plugins: { legend: legend() },
       scales: {
         x: { ...xAxis(), stacked: true },
