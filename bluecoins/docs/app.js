@@ -607,10 +607,9 @@ function renderExposure(vr) {
 }
 
 // ── Chart 5: Investment Earnings vs Savings ──────────────────────────────────
-// Total savings invested (what you put in from salary) is drawn as a flat
-// reference line at y=0. The line above it is net worth − savings = the slice
-// of net worth that came from investment earnings, so you can read directly how
-// much of your wealth was *earned* by investments versus *saved* from salary.
+// Monthly (non-cumulative) investment return: how much did investments gain or
+// lose each month, independent of salary savings. The zero line is breakeven;
+// green above = gain that month, red below = loss.
 function renderGrowth(vr) {
   const { rows } = parseBlock(vr, true);
   if (!rows.length) return;
@@ -619,13 +618,11 @@ function renderGrowth(vr) {
   const nw      = rows.map((r) => parseFloat(r[1]) || 0);
   const savings = rows.map((r) => parseFloat(r[2]) || 0);
 
-  // Investment earnings = how far net worth sits above the savings reference.
-  // Positive when investments have added value; negative if they ever fall
-  // behind what was contributed.
-  const earnings = nw.map((v, i) => v - savings[i]);
+  // cumGap[i] = total investment earnings accumulated up to month i.
+  // earnings[i] = change in that gap for month i = monthly return from investments.
+  const cumGap  = nw.map((v, i) => v - savings[i]);
+  const earnings = cumGap.map((v, i) => (i === 0 ? v : v - cumGap[i - 1]));
 
-  // Signed PKR formatter — the shared fmtPKR() strips the sign via Math.abs(),
-  // so a dip below the reference would otherwise read as positive.
   const fmtSigned = (v) => (v < 0 ? '−' : '') + fmtPKR(v);
 
   mkChart('chart-growth', {
@@ -634,7 +631,7 @@ function renderGrowth(vr) {
       labels,
       datasets: [
         {
-          label: 'Total Savings Invested (reference)',
+          label: 'Breakeven (zero return)',
           data: labels.map(() => 0),
           borderColor: c('yellow', '.85'),
           backgroundColor: 'transparent',
@@ -644,17 +641,13 @@ function renderGrowth(vr) {
           pointStyle: 'line',
         },
         {
-          label: 'Earned from Investments',
+          label: 'Monthly Investment Return',
           data: earnings,
           borderColor: c('green', '.85'),
-          // Shade the gap above the savings line — this band IS the portion of
-          // net worth earned by investments at each month.
           backgroundColor: c('green', '.12'),
           fill: 'origin',
           tension: .35, pointRadius: 2,
           pointStyle: 'line',
-          // Colour the line red over any stretch where investments fall behind
-          // contributions (earnings drop below the reference).
           segment: {
             borderColor: (ctx) =>
               ctx.p0.parsed.y < 0 ? c('red', '.85') : c('green', '.85'),
@@ -670,17 +663,21 @@ function renderGrowth(vr) {
           callbacks: {
             label: (item) => {
               const i = item.dataIndex;
-              return item.datasetIndex === 0
-                ? ` Savings invested: ${fmtPKRFull(savings[i])}`
-                : ` Net worth: ${fmtPKRFull(nw[i])}`;
+              if (item.datasetIndex === 0) {
+                const monthSav = i === 0 ? savings[i] : savings[i] - savings[i - 1];
+                return ` Savings added: ${fmtPKRFull(monthSav)}`;
+              }
+              const v = earnings[i];
+              return v >= 0
+                ? ` Investment return: +${fmtPKRFull(v)}`
+                : ` Investment loss: −${fmtPKRFull(Math.abs(v))}`;
             },
             afterBody: (items) => {
-              const i    = items[0].dataIndex;
-              const earn = nw[i] - savings[i];
-              const pct  = nw[i] ? Math.round((earn / nw[i]) * 100) : 0;
-              return earn >= 0
-                ? `Earned from investments: +${fmtPKRFull(earn)} (${pct}% of net worth)`
-                : `Investments behind: −${fmtPKRFull(Math.abs(earn))}`;
+              const i   = items[0].dataIndex;
+              const cum = cumGap[i];
+              return cum >= 0
+                ? `Cumulative total: +${fmtPKRFull(cum)}`
+                : `Cumulative total: −${fmtPKRFull(Math.abs(cum))}`;
             },
           },
         },
