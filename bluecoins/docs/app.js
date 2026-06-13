@@ -473,6 +473,22 @@ function renderAllocation(vr) {
   const cats   = ['Cash/PKR', 'Investments', 'Foreign Currency', 'Gold', 'Receivables'];
   const colors = ['blue', 'purple', 'teal', 'yellow', 'slate'];
 
+  // Per-month totals (all categories sum to net worth) for % share labels.
+  const totals = rows.map((r) =>
+    cats.reduce((s, _cat, i) => s + (parseFloat(r[i + 1]) || 0), 0));
+
+  // Subtle % labels at a few evenly spaced months — only on bands with enough
+  // share to stay readable (thin slivers like Gold/Receivables are skipped).
+  const LABEL_COUNT = 3;
+  const last  = labels.length - 1;
+  const start = Math.min(2, last);
+  const span  = last - start;
+  const labelIdx = new Set(
+    Array.from({ length: LABEL_COUNT }, (_, k) =>
+      start + (span ? Math.round((k * span) / (LABEL_COUNT - 1)) : 0))
+  );
+  const share = (j, v) => (totals[j] ? (v / totals[j]) * 100 : 0);
+
   const datasets = cats.map((cat, i) => ({
     label: cat,
     data: rows.map((r) => parseFloat(r[i + 1]) || 0),
@@ -483,14 +499,29 @@ function renderAllocation(vr) {
     tension: .3,
     pointRadius: 0,
     pointHoverRadius: 4,
+    datalabels: {
+      display: (ctx) =>
+        labelIdx.has(ctx.dataIndex) &&
+        share(ctx.dataIndex, ctx.dataset.data[ctx.dataIndex]) >= 7,
+      formatter: (value, ctx) => Math.round(share(ctx.dataIndex, value)) + '%',
+      // Sit just inside the top of each band; muted, no background — quieter
+      // than the Currency Exposure labels.
+      anchor: 'center', align: 'bottom', offset: 1, clamp: true,
+      color: 'rgba(255,255,255,.78)',
+      font: { size: 9 },
+      textShadowColor: 'rgba(0,0,0,.5)',
+      textShadowBlur: 3,
+    },
   }));
 
   mkChart('chart-allocation', {
     type: 'line',
+    plugins: window.ChartDataLabels ? [window.ChartDataLabels] : [],
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' },
+      layout: { padding: { right: 22 } },  // room for last-month % labels
       plugins: { legend: legend() },
       scales: {
         x: { ...xAxis(), stacked: true },
@@ -538,9 +569,9 @@ function renderExposure(vr) {
         return total ? Math.round((value / total) * 100) + '%' : null;
       },
       color: '#fff',
-      backgroundColor: c(color, '.9'),
-      borderRadius: 4,
-      padding: { top: 2, bottom: 2, left: 5, right: 5 },
+      // No background pill — a soft shadow keeps the text legible over the area.
+      textShadowColor: 'rgba(0,0,0,.6)',
+      textShadowBlur: 4,
       font: { size: 10, weight: 'bold' },
       ...dl,
     },
