@@ -345,18 +345,30 @@ function renderNW(vr) {
   // Pad actual series so they align with the extended label axis.
   const pad = new Array(FCAST).fill(null);
 
-  // Value label on the last ACTUAL month (not the padded forecast tail).
-  const lastActualLabel = {
-    display: (ctx) => ctx.dataIndex === n - 1,
+  // Evenly-spaced label indices across actual months (matches allocation chart style).
+  const LABEL_COUNT = 4;
+  const last    = n - 1;
+  const lstart  = Math.min(2, last);
+  const lspan   = last - lstart;
+  const labelIdx = new Set(
+    Array.from({ length: LABEL_COUNT }, (_, k) =>
+      lstart + (lspan ? Math.round((k * lspan) / (LABEL_COUNT - 1)) : 0))
+  );
+
+  const nominalLabel = {
+    display: (ctx) => labelIdx.has(ctx.dataIndex),
     align: 'top', anchor: 'end',
-    color: '#CBD5E1',
+    color: 'rgba(255,255,255,.78)',
     font: { size: 9, weight: '600' },
     formatter: (v) => fmtPKR(v),
     offset: 2,
+    textShadowColor: 'rgba(0,0,0,.5)',
+    textShadowBlur: 3,
   };
 
   mkChart('chart-nw', {
     type: 'line',
+    plugins: window.ChartDataLabels ? [window.ChartDataLabels] : [],
     data: {
       labels,
       datasets: [
@@ -367,7 +379,7 @@ function renderNW(vr) {
           backgroundColor: c('blue', '.08'),
           fill: true, tension: .35, pointRadius: 2, pointHoverRadius: 5,
           pointStyle: 'line',
-          datalabels: lastActualLabel,
+          datalabels: nominalLabel,
         },
         {
           label: 'Forecast',
@@ -392,7 +404,7 @@ function renderNW(vr) {
           backgroundColor: 'transparent',
           borderDash: [5, 4], tension: .35, pointRadius: 2, pointHoverRadius: 5,
           pointStyle: 'line',
-          datalabels: lastActualLabel,
+          datalabels: { display: false },
         },
       ],
     },
