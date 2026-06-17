@@ -358,12 +358,12 @@ function renderNW(vr) {
   const nominalLabel = {
     display: (ctx) => labelIdx.has(ctx.dataIndex),
     align: 'top', anchor: 'end',
-    color: 'rgba(255,255,255,.78)',
+    color: c('blue', '.9'),
     font: { size: 9, weight: '600' },
     formatter: (v) => fmtPKR(v),
     offset: 2,
-    textShadowColor: 'rgba(0,0,0,.5)',
-    textShadowBlur: 3,
+    textShadowColor: 'rgba(0,0,0,.6)',
+    textShadowBlur: 4,
   };
 
   mkChart('chart-nw', {
